@@ -78,11 +78,16 @@ public class MapRuntimeBuilder : MonoBehaviour
     {
         switch (world)
         {
-            case 1: return new Color(0.32f, 0.55f, 0.25f);
-            case 2: return new Color(0.16f, 0.4f, 0.18f);
-            case 3: return new Color(0.45f, 0.42f, 0.38f);
-            case 4: return new Color(0.45f, 0.22f, 0.12f);
-            case 5: return new Color(0.22f, 0.12f, 0.28f);
+            case 1: return new Color(0.32f, 0.55f, 0.25f);  // grass
+            case 2: return new Color(0.16f, 0.4f, 0.18f);   // forest
+            case 3: return new Color(0.45f, 0.42f, 0.38f);  // ruins
+            case 4: return new Color(0.45f, 0.22f, 0.12f);  // volcano
+            case 5: return new Color(0.22f, 0.12f, 0.28f);  // end
+            case 6: return new Color(0.72f, 0.82f, 0.92f);  // frost
+            case 7: return new Color(0.72f, 0.58f, 0.32f);  // desert
+            case 8: return new Color(0.22f, 0.38f, 0.28f);  // swamp
+            case 9: return new Color(0.55f, 0.7f, 0.9f);    // sky
+            case 10: return new Color(0.12f, 0.05f, 0.14f); // abyss
             default: return Color.gray;
         }
     }
@@ -96,7 +101,27 @@ public class MapRuntimeBuilder : MonoBehaviour
             case 3: return new Color(0.55f, 0.55f, 0.52f);
             case 4: return new Color(0.35f, 0.15f, 0.1f);
             case 5: return new Color(0.15f, 0.08f, 0.2f);
+            case 6: return new Color(0.55f, 0.7f, 0.85f);
+            case 7: return new Color(0.55f, 0.4f, 0.22f);
+            case 8: return new Color(0.18f, 0.28f, 0.2f);
+            case 9: return new Color(0.75f, 0.8f, 0.9f);
+            case 10: return new Color(0.25f, 0.08f, 0.12f);
             default: return Color.gray;
+        }
+    }
+
+    Color ThemeBossAccent(int world)
+    {
+        switch (world)
+        {
+            case 4: return new Color(1f, 0.35f, 0.05f);      // lava
+            case 6: return new Color(0.65f, 0.85f, 1f);      // ice
+            case 7: return new Color(0.9f, 0.7f, 0.25f);     // sand glow
+            case 8: return new Color(0.35f, 0.7f, 0.25f);    // toxic
+            case 9: return new Color(0.85f, 0.9f, 1f);       // cloud
+            case 10: return new Color(0.7f, 0.15f, 0.85f);   // void
+            case 5: return new Color(0.55f, 0.2f, 0.75f);
+            default: return new Color(0.55f, 0.12f, 0.12f);
         }
     }
 
@@ -251,13 +276,16 @@ public class MapRuntimeBuilder : MonoBehaviour
                 if (cat == null || !TryDecor(cat.bossAltarPrefab, "BossAltar", center + new Vector3(0f, 0f, 2f), cat.bossAltarScale, parent))
                 {
                     Prim(PrimitiveType.Cube, "BossAltar", center + new Vector3(0f, 0.4f, 2f), new Vector3(6f, 0.8f, 6f),
-                        MakeTempMat(new Color(0.55f, 0.12f, 0.12f)), parent);
+                        MakeTempMat(ThemeBossAccent(world)), parent);
                 }
                 Prim(PrimitiveType.Cylinder, "BossRing", center + new Vector3(0f, 0.05f, 2f), new Vector3(10f, 0.06f, 10f),
-                    MakeTempMat(new Color(0.35f, 0.08f, 0.08f)), parent);
-                if (world == 4)
-                    Prim(PrimitiveType.Cylinder, "Lava", center + new Vector3(6f, 0.03f, -4f), new Vector3(4f, 0.05f, 4f),
-                        MakeTempMat(new Color(1f, 0.35f, 0.05f)), parent);
+                    MakeTempMat(Color.Lerp(ThemeBossAccent(world), Color.black, 0.45f)), parent);
+                // World-flavored hazard pool beside the altar.
+                if (world == 4 || world == 6 || world == 7 || world == 8 || world == 10)
+                {
+                    Prim(PrimitiveType.Cylinder, "Hazard", center + new Vector3(6f, 0.03f, -4f), new Vector3(4f, 0.05f, 4f),
+                        MakeTempMat(ThemeBossAccent(world)), parent);
+                }
                 ScatterNature(parent, center, cat, bushes: 0, rocks: 5, mushrooms: 0, grass: 0, trees: 0, stumps: 0);
                 break;
         }

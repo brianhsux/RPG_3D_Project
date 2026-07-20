@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 5 worlds × 4 map tiles in a physical 2x2 grid per world.
+/// 10 worlds × 4 map tiles in a physical layout per world.
 /// Walk between tiles via corridors. Each tile has its own monsters.
 /// </summary>
 public class AdventureManager : MonoBehaviour
@@ -252,7 +252,7 @@ public class AdventureManager : MonoBehaviour
         y += RPGUI.TitleH + 4f;
 
         GUI.Label(new Rect(x, y, textW, RPGUI.LabelH),
-            $"世界 {currentWorld}/5   目前區域 {currentMap}/4   強度 Lv{ContentLevel}", RPGUI.Label);
+            $"世界 {currentWorld}/{ProgressionFormulas.WorldCount}   目前區域 {currentMap}/4   強度 Lv{ContentLevel}", RPGUI.Label);
         y += RPGUI.LabelH + 2f;
 
         GUI.Label(new Rect(x, y, textW, RPGUI.LabelH),
@@ -279,11 +279,11 @@ public class AdventureManager : MonoBehaviour
             GUI.Label(tip, "地圖4 傳送門已開！走到發光門前往下一世界", RPGUI.Banner);
         }
 
-        if (currentWorld == 5 && IsBossCleared(5, 4))
+        if (currentWorld == ProgressionFormulas.WorldCount && IsBossCleared(ProgressionFormulas.WorldCount, 4))
         {
-            Rect tip = new Rect(Screen.width * 0.5f - 300f, 100f, 600f, RPGUI.BannerH + 12f);
+            Rect tip = new Rect(Screen.width * 0.5f - 320f, 100f, 640f, RPGUI.BannerH + 12f);
             RPGUI.DrawPanel(tip, new Color(0.35f, 0.25f, 0.05f, 0.92f));
-            GUI.Label(tip, "恭喜通關五個世界！", RPGUI.Banner);
+            GUI.Label(tip, $"恭喜通關全部 {ProgressionFormulas.WorldCount} 個世界！", RPGUI.Banner);
         }
     }
 }

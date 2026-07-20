@@ -1,14 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// Central balance sheet for the 5-world adventure.
-/// contentLevel = (world-1)*4 + map  →  range 1..20
-/// Design goal: ~2-4 hours to clear all worlds; gear crafting is the main gate.
+/// Central balance sheet for the adventure.
+/// contentLevel = (world-1)*4 + map  →  range 1..(WorldCount*MapsPerWorld)
 /// </summary>
 public static class ProgressionFormulas
 {
-    public const int WorldCount = 5;
+    public const int WorldCount = 10;
     public const int MapsPerWorld = 4;
+    public const int MaxContentLevel = WorldCount * MapsPerWorld;
 
     public static int ContentLevel(int world, int map)
     {
@@ -83,12 +83,12 @@ public static class ProgressionFormulas
         int baseLv = contentLevel;
         int roll = Random.Range(-1, 3); // -1..2
         if (fromBoss) roll += 2;
-        return Mathf.Clamp(baseLv + roll, 1, 40);
+        return Mathf.Clamp(baseLv + roll, 1, MaxContentLevel);
     }
 
     public static ItemRarity RollRarity(int contentLevel, bool fromBoss)
     {
-        float t = contentLevel / 20f;
+        float t = contentLevel / (float)MaxContentLevel;
         float r = Random.value;
         if (fromBoss) r -= 0.25f;
 
@@ -141,7 +141,7 @@ public static class ProgressionFormulas
         if (Random.value < 0.15f && best < ItemRarity.Legendary)
             best = (ItemRarity)((int)best + 1);
 
-        int newLevel = Mathf.Clamp(avg + bonus, 1, 40);
+        int newLevel = Mathf.Clamp(avg + bonus, 1, MaxContentLevel);
         return ItemFactory.Create(a.slot, newLevel, best);
     }
 
@@ -154,23 +154,44 @@ public static class ProgressionFormulas
             case 3: return "遺跡世界";
             case 4: return "火山世界";
             case 5: return "終焉世界";
+            case 6: return "冰霜世界";
+            case 7: return "沙漠世界";
+            case 8: return "沼澤世界";
+            case 9: return "天空世界";
+            case 10: return "深淵世界";
             default: return "未知世界";
         }
     }
 
     public static string MapName(int world, int map)
     {
+        map = Mathf.Clamp(map, 1, MapsPerWorld);
         if (map == 4) return WorldThemeName(world) + " · 首領殿堂";
-        return WorldThemeName(world) + " · 地圖 " + map;
+
+        string zone;
+        switch (world)
+        {
+            case 1: zone = map == 1 ? "牧草地" : map == 2 ? "丘陵" : "蟲巢"; break;
+            case 2: zone = map == 1 ? "樹屋村" : map == 2 ? "密林" : "蛛網谷"; break;
+            case 3: zone = map == 1 ? "廢墟門廊" : map == 2 ? "墓園" : "死靈迴廊"; break;
+            case 4: zone = map == 1 ? "熔岩村" : map == 2 ? "火口" : "岩魔窟"; break;
+            case 5: zone = map == 1 ? "扭曲平原" : map == 2 ? "晶核林" : "魔樹海"; break;
+            case 6: zone = map == 1 ? "雪原營地" : map == 2 ? "凍湖" : "冰晶洞"; break;
+            case 7: zone = map == 1 ? "綠洲" : map == 2 ? "沙丘" : "蝎穴"; break;
+            case 8: zone = map == 1 ? "泥屋" : map == 2 ? "毒沼" : "腐根林"; break;
+            case 9: zone = map == 1 ? "浮島村" : map == 2 ? "雲橋" : "風暴巢"; break;
+            case 10: zone = map == 1 ? "深淵碼頭" : map == 2 ? "虛空裂縫" : "魔王前廳"; break;
+            default: zone = "地圖 " + map; break;
+        }
+        return WorldThemeName(world) + " · " + zone;
     }
 
     // ---- Player XP / Level ----
-    public const int MaxPlayerLevel = 50;
+    public const int MaxPlayerLevel = 60;
 
     public static int XpToNextLevel(int level)
     {
         level = Mathf.Clamp(level, 1, MaxPlayerLevel);
-        // Lv1→2 = 40, grows steadily so mid-game still feels rewarding
         return Mathf.RoundToInt(35f + level * 28f + level * level * 1.8f);
     }
 

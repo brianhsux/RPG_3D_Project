@@ -45,18 +45,23 @@ public static class EnemyVisuals
     /// <summary>One monster type per map 1-3, varied by world.</summary>
     public static EnemyKind KindForZone(int world, int map)
     {
-        // 5 worlds × 3 trash zones
+        // 10 worlds × 3 trash zones
         EnemyKind[,] table =
         {
             // map1, map2, map3
-            { EnemyKind.Slime, EnemyKind.Wolf, EnemyKind.Beetle },       // world 1 草原
-            { EnemyKind.Goblin, EnemyKind.Mushroom, EnemyKind.Spider },  // world 2 森林
-            { EnemyKind.Skeleton, EnemyKind.Ghost, EnemyKind.Wraith },   // world 3 遺跡
-            { EnemyKind.Imp, EnemyKind.LavaSpawn, EnemyKind.Golem },     // world 4 火山
-            { EnemyKind.Demon, EnemyKind.Crystal, EnemyKind.Treant }     // world 5 終焉 (twisted)
+            { EnemyKind.Slime, EnemyKind.Wolf, EnemyKind.Beetle },       // 1 草原
+            { EnemyKind.Goblin, EnemyKind.Mushroom, EnemyKind.Spider },  // 2 森林
+            { EnemyKind.Skeleton, EnemyKind.Ghost, EnemyKind.Wraith },   // 3 遺跡
+            { EnemyKind.Imp, EnemyKind.LavaSpawn, EnemyKind.Golem },     // 4 火山
+            { EnemyKind.Demon, EnemyKind.Crystal, EnemyKind.Treant },    // 5 終焉
+            { EnemyKind.Wolf, EnemyKind.Bat, EnemyKind.Crystal },        // 6 冰霜
+            { EnemyKind.Beetle, EnemyKind.Golem, EnemyKind.Spider },     // 7 沙漠
+            { EnemyKind.Slime, EnemyKind.Mushroom, EnemyKind.Treant },   // 8 沼澤
+            { EnemyKind.Bat, EnemyKind.Imp, EnemyKind.Wraith },          // 9 天空
+            { EnemyKind.Demon, EnemyKind.Ghost, EnemyKind.LavaSpawn }    // 10 深淵
         };
 
-        world = Mathf.Clamp(world, 1, 5);
+        world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
         map = Mathf.Clamp(map, 1, 3);
         return table[world - 1, map - 1];
     }
