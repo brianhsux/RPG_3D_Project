@@ -52,18 +52,29 @@ public class EnemyAI : MonoBehaviour
         switch (kind)
         {
             case EnemyKind.Wolf:
+            case EnemyKind.ShadowHound:
+            case EnemyKind.Griffon:
+            case EnemyKind.SandWorm:
+            case EnemyKind.Leech:
                 return ProceduralBodyAnim.BodyStyle.Quadruped;
             case EnemyKind.Bat:
             case EnemyKind.Imp:
             case EnemyKind.Demon:
+            case EnemyKind.Mosquito:
+            case EnemyKind.Harpy:
+            case EnemyKind.StormSprite:
                 return ProceduralBodyAnim.BodyStyle.Flyer;
             case EnemyKind.Spider:
             case EnemyKind.Beetle:
+            case EnemyKind.Scorpion:
                 return ProceduralBodyAnim.BodyStyle.Crawler;
             case EnemyKind.Slime:
             case EnemyKind.Mushroom:
             case EnemyKind.LavaSpawn:
             case EnemyKind.Crystal:
+            case EnemyKind.Toad:
+            case EnemyKind.IceElemental:
+            case EnemyKind.VoidEye:
                 return ProceduralBodyAnim.BodyStyle.Blob;
             default:
                 return ProceduralBodyAnim.BodyStyle.Humanoid;

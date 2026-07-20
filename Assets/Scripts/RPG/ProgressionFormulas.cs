@@ -71,7 +71,25 @@ public static class ProgressionFormulas
             case EnemyKind.Crystal: name = "水晶魔"; break;
             case EnemyKind.Wraith: name = "死靈"; break;
             case EnemyKind.Demon: name = "惡魔"; break;
-            case EnemyKind.WorldBoss: return "世界首領 Lv" + contentLevel;
+            case EnemyKind.Yeti: name = "雪人"; break;
+            case EnemyKind.IceElemental: name = "冰元素"; break;
+            case EnemyKind.Scorpion: name = "沙蠍"; break;
+            case EnemyKind.Mummy: name = "木乃伊"; break;
+            case EnemyKind.SandWorm: name = "沙蟲"; break;
+            case EnemyKind.Toad: name = "毒蟾"; break;
+            case EnemyKind.Leech: name = "血蛭"; break;
+            case EnemyKind.Mosquito: name = "沼蚊"; break;
+            case EnemyKind.Harpy: name = "鷹身女妖"; break;
+            case EnemyKind.StormSprite: name = "風暴精靈"; break;
+            case EnemyKind.Griffon: name = "獅鷲"; break;
+            case EnemyKind.ShadowHound: name = "影犬"; break;
+            case EnemyKind.VoidEye: name = "虛空之眼"; break;
+            case EnemyKind.Tentacle: name = "深淵觸手"; break;
+            case EnemyKind.WorldBoss:
+            {
+                int w = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
+                return ProgressionFormulas.WorldThemeName(w) + "首領 Lv" + contentLevel;
+            }
             default: name = "怪物"; break;
         }
         return prefix + name + " Lv" + contentLevel;
@@ -208,6 +226,7 @@ public static class ProgressionFormulas
 
 public enum EnemyKind
 {
+    // Worlds 1-5
     Slime,
     Goblin,
     Skeleton,
@@ -224,6 +243,21 @@ public enum EnemyKind
     Crystal,
     Wraith,
     Demon,
+    // Worlds 6-10 (unique — never reused across worlds)
+    Yeti,
+    IceElemental,
+    Scorpion,
+    Mummy,
+    SandWorm,
+    Toad,
+    Leech,
+    Mosquito,
+    Harpy,
+    StormSprite,
+    Griffon,
+    ShadowHound,
+    VoidEye,
+    Tentacle,
     WorldBoss
 }
 

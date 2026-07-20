@@ -37,28 +37,41 @@ public static class EnemyVisuals
             case EnemyKind.Crystal: BuildCrystal(root, scale); break;
             case EnemyKind.Wraith: BuildWraith(root, scale); break;
             case EnemyKind.Demon: BuildDemon(root, scale); break;
+            case EnemyKind.Yeti: BuildYeti(root, scale); break;
+            case EnemyKind.IceElemental: BuildIceElemental(root, scale); break;
+            case EnemyKind.Scorpion: BuildScorpion(root, scale); break;
+            case EnemyKind.Mummy: BuildMummy(root, scale); break;
+            case EnemyKind.SandWorm: BuildSandWorm(root, scale); break;
+            case EnemyKind.Toad: BuildToad(root, scale); break;
+            case EnemyKind.Leech: BuildLeech(root, scale); break;
+            case EnemyKind.Mosquito: BuildMosquito(root, scale); break;
+            case EnemyKind.Harpy: BuildHarpy(root, scale); break;
+            case EnemyKind.StormSprite: BuildStormSprite(root, scale); break;
+            case EnemyKind.Griffon: BuildGriffon(root, scale); break;
+            case EnemyKind.ShadowHound: BuildShadowHound(root, scale); break;
+            case EnemyKind.VoidEye: BuildVoidEye(root, scale); break;
+            case EnemyKind.Tentacle: BuildTentacle(root, scale); break;
             case EnemyKind.WorldBoss: BuildWorldBoss(root, scale); break;
             default: BuildSlime(root, scale); break;
         }
     }
 
-    /// <summary>One monster type per map 1-3, varied by world.</summary>
+    /// <summary>One unique monster type per zone — no kind reused across worlds.</summary>
     public static EnemyKind KindForZone(int world, int map)
     {
-        // 10 worlds × 3 trash zones
         EnemyKind[,] table =
         {
             // map1, map2, map3
-            { EnemyKind.Slime, EnemyKind.Wolf, EnemyKind.Beetle },       // 1 草原
-            { EnemyKind.Goblin, EnemyKind.Mushroom, EnemyKind.Spider },  // 2 森林
-            { EnemyKind.Skeleton, EnemyKind.Ghost, EnemyKind.Wraith },   // 3 遺跡
-            { EnemyKind.Imp, EnemyKind.LavaSpawn, EnemyKind.Golem },     // 4 火山
-            { EnemyKind.Demon, EnemyKind.Crystal, EnemyKind.Treant },    // 5 終焉
-            { EnemyKind.Wolf, EnemyKind.Bat, EnemyKind.Crystal },        // 6 冰霜
-            { EnemyKind.Beetle, EnemyKind.Golem, EnemyKind.Spider },     // 7 沙漠
-            { EnemyKind.Slime, EnemyKind.Mushroom, EnemyKind.Treant },   // 8 沼澤
-            { EnemyKind.Bat, EnemyKind.Imp, EnemyKind.Wraith },          // 9 天空
-            { EnemyKind.Demon, EnemyKind.Ghost, EnemyKind.LavaSpawn }    // 10 深淵
+            { EnemyKind.Slime, EnemyKind.Wolf, EnemyKind.Beetle },         // 1 草原
+            { EnemyKind.Goblin, EnemyKind.Mushroom, EnemyKind.Spider },    // 2 森林
+            { EnemyKind.Skeleton, EnemyKind.Ghost, EnemyKind.Wraith },     // 3 遺跡
+            { EnemyKind.Imp, EnemyKind.LavaSpawn, EnemyKind.Golem },       // 4 火山
+            { EnemyKind.Demon, EnemyKind.Crystal, EnemyKind.Treant },      // 5 終焉
+            { EnemyKind.Bat, EnemyKind.Yeti, EnemyKind.IceElemental },    // 6 冰霜
+            { EnemyKind.Scorpion, EnemyKind.Mummy, EnemyKind.SandWorm },  // 7 沙漠
+            { EnemyKind.Toad, EnemyKind.Leech, EnemyKind.Mosquito },      // 8 沼澤
+            { EnemyKind.Harpy, EnemyKind.StormSprite, EnemyKind.Griffon },// 9 天空
+            { EnemyKind.ShadowHound, EnemyKind.VoidEye, EnemyKind.Tentacle } // 10 深淵
         };
 
         world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
@@ -340,10 +353,26 @@ public static class EnemyVisuals
 
     static void BuildWorldBoss(Transform parent, float scale)
     {
-        var armor = Mat(new Color(0.55f, 0.1f, 0.12f));
-        var dark = Mat(new Color(0.15f, 0.05f, 0.08f));
-        var gold = Mat(new Color(0.95f, 0.75f, 0.25f));
-        var eye = Mat(new Color(1f, 0.2f, 0.1f));
+        int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
+        Color armorC, darkC, accentC, eyeC;
+        switch (world)
+        {
+            case 1: armorC = new Color(0.35f, 0.55f, 0.25f); darkC = new Color(0.2f, 0.3f, 0.12f); accentC = new Color(0.9f, 0.8f, 0.3f); eyeC = new Color(1f, 0.9f, 0.2f); break;
+            case 2: armorC = new Color(0.2f, 0.45f, 0.18f); darkC = new Color(0.15f, 0.2f, 0.1f); accentC = new Color(0.6f, 0.9f, 0.3f); eyeC = new Color(0.8f, 1f, 0.4f); break;
+            case 3: armorC = new Color(0.55f, 0.52f, 0.48f); darkC = new Color(0.25f, 0.22f, 0.2f); accentC = new Color(0.85f, 0.85f, 0.7f); eyeC = new Color(0.9f, 0.2f, 0.2f); break;
+            case 4: armorC = new Color(0.7f, 0.25f, 0.1f); darkC = new Color(0.25f, 0.08f, 0.05f); accentC = new Color(1f, 0.6f, 0.15f); eyeC = new Color(1f, 0.4f, 0.1f); break;
+            case 5: armorC = new Color(0.4f, 0.12f, 0.5f); darkC = new Color(0.12f, 0.05f, 0.18f); accentC = new Color(0.85f, 0.4f, 1f); eyeC = new Color(1f, 0.3f, 1f); break;
+            case 6: armorC = new Color(0.65f, 0.8f, 0.95f); darkC = new Color(0.35f, 0.45f, 0.55f); accentC = new Color(0.9f, 0.95f, 1f); eyeC = new Color(0.4f, 0.8f, 1f); break;
+            case 7: armorC = new Color(0.75f, 0.55f, 0.25f); darkC = new Color(0.35f, 0.22f, 0.1f); accentC = new Color(1f, 0.85f, 0.4f); eyeC = new Color(1f, 0.7f, 0.2f); break;
+            case 8: armorC = new Color(0.25f, 0.45f, 0.28f); darkC = new Color(0.12f, 0.2f, 0.12f); accentC = new Color(0.5f, 0.9f, 0.35f); eyeC = new Color(0.7f, 1f, 0.3f); break;
+            case 9: armorC = new Color(0.7f, 0.8f, 0.95f); darkC = new Color(0.4f, 0.5f, 0.65f); accentC = new Color(1f, 1f, 1f); eyeC = new Color(0.6f, 0.85f, 1f); break;
+            default: armorC = new Color(0.35f, 0.08f, 0.4f); darkC = new Color(0.08f, 0.02f, 0.1f); accentC = new Color(0.9f, 0.2f, 1f); eyeC = new Color(1f, 0.15f, 0.5f); break;
+        }
+
+        var armor = Mat(armorC);
+        var dark = Mat(darkC);
+        var gold = Mat(accentC);
+        var eye = Mat(eyeC);
         Part(parent, PrimitiveType.Capsule, "Body", new Vector3(0f, 1.4f * scale, 0f), new Vector3(1.3f, 1.3f, 1.0f) * scale, armor);
         Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 2.9f * scale, 0f), Vector3.one * 0.85f * scale, armor);
         Part(parent, PrimitiveType.Cube, "Crown", new Vector3(0f, 3.4f * scale, 0f), new Vector3(0.9f, 0.25f, 0.9f) * scale, gold);
@@ -360,5 +389,212 @@ public static class EnemyVisuals
         Part(parent, PrimitiveType.Cube, "LegL", new Vector3(-0.4f * scale, 0.4f * scale, 0f), new Vector3(0.45f, 0.8f, 0.45f) * scale, dark);
         Part(parent, PrimitiveType.Cube, "LegR", new Vector3(0.4f * scale, 0.4f * scale, 0f), new Vector3(0.45f, 0.8f, 0.45f) * scale, dark);
         Part(parent, PrimitiveType.Cube, "Cape", new Vector3(0f, 1.5f * scale, -0.6f * scale), new Vector3(1.4f, 1.6f, 0.12f) * scale, dark);
+
+        // Extra silhouette cue per world
+        switch (world)
+        {
+            case 6:
+                Part(parent, PrimitiveType.Cube, "IceHornL", new Vector3(-0.4f * scale, 3.5f * scale, 0f), new Vector3(0.15f, 0.7f, 0.15f) * scale, gold);
+                Part(parent, PrimitiveType.Cube, "IceHornR", new Vector3(0.4f * scale, 3.5f * scale, 0f), new Vector3(0.15f, 0.7f, 0.15f) * scale, gold);
+                break;
+            case 7:
+                Part(parent, PrimitiveType.Sphere, "SandOrb", new Vector3(0f, 1.6f * scale, 0.55f * scale), Vector3.one * 0.4f * scale, gold);
+                break;
+            case 9:
+                Part(parent, PrimitiveType.Cube, "WingL", new Vector3(-1.3f * scale, 2.2f * scale, -0.2f * scale), new Vector3(1.4f, 0.12f, 0.8f) * scale, gold);
+                Part(parent, PrimitiveType.Cube, "WingR", new Vector3(1.3f * scale, 2.2f * scale, -0.2f * scale), new Vector3(1.4f, 0.12f, 0.8f) * scale, gold);
+                break;
+            case 10:
+                Part(parent, PrimitiveType.Sphere, "VoidCore", new Vector3(0f, 1.5f * scale, 0.5f * scale), Vector3.one * 0.45f * scale, gold);
+                break;
+        }
+    }
+
+    static void BuildYeti(Transform parent, float scale)
+    {
+        var fur = Mat(new Color(0.85f, 0.9f, 0.95f));
+        var dark = Mat(new Color(0.45f, 0.5f, 0.55f));
+        Part(parent, PrimitiveType.Capsule, "Body", new Vector3(0f, 1.1f * scale, 0f), new Vector3(1.1f, 0.9f, 0.85f) * scale, fur);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 2.2f * scale, 0.1f * scale), Vector3.one * 0.7f * scale, fur);
+        Part(parent, PrimitiveType.Cube, "ArmL", new Vector3(-0.85f * scale, 1.1f * scale, 0f), new Vector3(0.4f, 0.9f, 0.4f) * scale, fur);
+        Part(parent, PrimitiveType.Cube, "ArmR", new Vector3(0.85f * scale, 1.1f * scale, 0f), new Vector3(0.4f, 0.9f, 0.4f) * scale, fur);
+        Part(parent, PrimitiveType.Capsule, "LegL", new Vector3(-0.3f * scale, 0.35f * scale, 0f), new Vector3(0.35f, 0.35f, 0.35f) * scale, dark);
+        Part(parent, PrimitiveType.Capsule, "LegR", new Vector3(0.3f * scale, 0.35f * scale, 0f), new Vector3(0.35f, 0.35f, 0.35f) * scale, dark);
+        Part(parent, PrimitiveType.Sphere, "EyeL", new Vector3(-0.18f * scale, 2.25f * scale, 0.35f * scale), Vector3.one * 0.12f * scale, Mat(Color.black));
+        Part(parent, PrimitiveType.Sphere, "EyeR", new Vector3(0.18f * scale, 2.25f * scale, 0.35f * scale), Vector3.one * 0.12f * scale, Mat(Color.black));
+    }
+
+    static void BuildIceElemental(Transform parent, float scale)
+    {
+        var ice = Mat(new Color(0.55f, 0.8f, 1f));
+        var core = Mat(new Color(0.85f, 0.95f, 1f));
+        Part(parent, PrimitiveType.Cube, "Core", new Vector3(0f, 1.1f * scale, 0f), new Vector3(0.9f, 1.4f, 0.9f) * scale, ice);
+        Part(parent, PrimitiveType.Cube, "Spike1", new Vector3(-0.5f * scale, 1.8f * scale, 0f), new Vector3(0.25f, 1.0f, 0.25f) * scale, core);
+        Part(parent, PrimitiveType.Cube, "Spike2", new Vector3(0.5f * scale, 1.9f * scale, 0.1f * scale), new Vector3(0.25f, 1.1f, 0.25f) * scale, core);
+        Part(parent, PrimitiveType.Cube, "Spike3", new Vector3(0f, 2.2f * scale, -0.2f * scale), new Vector3(0.3f, 0.9f, 0.3f) * scale, ice);
+        Part(parent, PrimitiveType.Sphere, "Eye", new Vector3(0f, 1.3f * scale, 0.5f * scale), Vector3.one * 0.28f * scale, core);
+        Part(parent, PrimitiveType.Cube, "Base", new Vector3(0f, 0.25f * scale, 0f), new Vector3(1.1f, 0.4f, 1.1f) * scale, Mat(new Color(0.4f, 0.55f, 0.7f)));
+    }
+
+    static void BuildScorpion(Transform parent, float scale)
+    {
+        var shell = Mat(new Color(0.65f, 0.4f, 0.18f));
+        var dark = Mat(new Color(0.35f, 0.2f, 0.08f));
+        Part(parent, PrimitiveType.Sphere, "Body", new Vector3(0f, 0.5f * scale, 0f), new Vector3(1.4f, 0.7f, 1.8f) * scale, shell);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 0.55f * scale, 0.85f * scale), Vector3.one * 0.55f * scale, shell);
+        Part(parent, PrimitiveType.Cube, "Tail", new Vector3(0f, 1.0f * scale, -0.7f * scale), new Vector3(0.2f, 1.0f, 0.2f) * scale, dark);
+        Part(parent, PrimitiveType.Sphere, "Stinger", new Vector3(0f, 1.55f * scale, -0.55f * scale), Vector3.one * 0.28f * scale, Mat(new Color(0.9f, 0.2f, 0.15f)));
+        Part(parent, PrimitiveType.Cube, "ClawL", new Vector3(-0.7f * scale, 0.45f * scale, 0.7f * scale), new Vector3(0.55f, 0.2f, 0.35f) * scale, dark);
+        Part(parent, PrimitiveType.Cube, "ClawR", new Vector3(0.7f * scale, 0.45f * scale, 0.7f * scale), new Vector3(0.55f, 0.2f, 0.35f) * scale, dark);
+        for (int i = 0; i < 3; i++)
+        {
+            float z = 0.4f - i * 0.35f;
+            Part(parent, PrimitiveType.Capsule, "LegL" + i, new Vector3(-0.7f * scale, 0.25f * scale, z * scale), new Vector3(0.12f, 0.25f, 0.12f) * scale, dark);
+            Part(parent, PrimitiveType.Capsule, "LegR" + i, new Vector3(0.7f * scale, 0.25f * scale, z * scale), new Vector3(0.12f, 0.25f, 0.12f) * scale, dark);
+        }
+    }
+
+    static void BuildMummy(Transform parent, float scale)
+    {
+        var wrap = Mat(new Color(0.85f, 0.75f, 0.55f));
+        var dark = Mat(new Color(0.35f, 0.25f, 0.15f));
+        Part(parent, PrimitiveType.Capsule, "Body", new Vector3(0f, 1.1f * scale, 0f), new Vector3(0.75f, 0.95f, 0.55f) * scale, wrap);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 2.25f * scale, 0f), Vector3.one * 0.5f * scale, wrap);
+        Part(parent, PrimitiveType.Cube, "ArmL", new Vector3(-0.55f * scale, 1.3f * scale, 0.25f * scale), new Vector3(0.22f, 0.7f, 0.22f) * scale, wrap);
+        Part(parent, PrimitiveType.Cube, "ArmR", new Vector3(0.55f * scale, 1.3f * scale, 0.25f * scale), new Vector3(0.22f, 0.7f, 0.22f) * scale, wrap);
+        Part(parent, PrimitiveType.Capsule, "LegL", new Vector3(-0.2f * scale, 0.35f * scale, 0f), new Vector3(0.22f, 0.35f, 0.22f) * scale, dark);
+        Part(parent, PrimitiveType.Capsule, "LegR", new Vector3(0.2f * scale, 0.35f * scale, 0f), new Vector3(0.22f, 0.35f, 0.22f) * scale, dark);
+        Part(parent, PrimitiveType.Cube, "Mask", new Vector3(0f, 2.25f * scale, 0.25f * scale), new Vector3(0.4f, 0.35f, 0.1f) * scale, dark);
+    }
+
+    static void BuildSandWorm(Transform parent, float scale)
+    {
+        var sand = Mat(new Color(0.7f, 0.55f, 0.3f));
+        var mouth = Mat(new Color(0.25f, 0.1f, 0.08f));
+        Part(parent, PrimitiveType.Sphere, "Seg1", new Vector3(0f, 0.7f * scale, 0f), new Vector3(1.3f, 1.3f, 1.3f) * scale, sand);
+        Part(parent, PrimitiveType.Sphere, "Seg2", new Vector3(0f, 1.5f * scale, -0.35f * scale), new Vector3(1.1f, 1.1f, 1.1f) * scale, sand);
+        Part(parent, PrimitiveType.Sphere, "Seg3", new Vector3(0f, 2.2f * scale, -0.55f * scale), new Vector3(0.9f, 0.9f, 0.9f) * scale, sand);
+        Part(parent, PrimitiveType.Sphere, "Mouth", new Vector3(0f, 2.55f * scale, -0.2f * scale), Vector3.one * 0.55f * scale, mouth);
+        Part(parent, PrimitiveType.Cube, "FangL", new Vector3(-0.2f * scale, 2.55f * scale, 0.15f * scale), new Vector3(0.1f, 0.1f, 0.35f) * scale, Mat(Color.white));
+        Part(parent, PrimitiveType.Cube, "FangR", new Vector3(0.2f * scale, 2.55f * scale, 0.15f * scale), new Vector3(0.1f, 0.1f, 0.35f) * scale, Mat(Color.white));
+    }
+
+    static void BuildToad(Transform parent, float scale)
+    {
+        var skin = Mat(new Color(0.3f, 0.55f, 0.28f));
+        var belly = Mat(new Color(0.55f, 0.65f, 0.35f));
+        Part(parent, PrimitiveType.Sphere, "Body", new Vector3(0f, 0.65f * scale, 0f), new Vector3(1.7f, 1.1f, 1.5f) * scale, skin);
+        Part(parent, PrimitiveType.Sphere, "Belly", new Vector3(0f, 0.5f * scale, 0.35f * scale), new Vector3(1.2f, 0.8f, 0.9f) * scale, belly);
+        Part(parent, PrimitiveType.Sphere, "EyeL", new Vector3(-0.4f * scale, 1.15f * scale, 0.45f * scale), Vector3.one * 0.35f * scale, Mat(new Color(1f, 0.9f, 0.3f)));
+        Part(parent, PrimitiveType.Sphere, "EyeR", new Vector3(0.4f * scale, 1.15f * scale, 0.45f * scale), Vector3.one * 0.35f * scale, Mat(new Color(1f, 0.9f, 0.3f)));
+        Part(parent, PrimitiveType.Sphere, "PupilL", new Vector3(-0.4f * scale, 1.2f * scale, 0.6f * scale), Vector3.one * 0.14f * scale, Mat(Color.black));
+        Part(parent, PrimitiveType.Sphere, "PupilR", new Vector3(0.4f * scale, 1.2f * scale, 0.6f * scale), Vector3.one * 0.14f * scale, Mat(Color.black));
+        Part(parent, PrimitiveType.Capsule, "LegL", new Vector3(-0.55f * scale, 0.3f * scale, -0.2f * scale), new Vector3(0.35f, 0.3f, 0.55f) * scale, skin);
+        Part(parent, PrimitiveType.Capsule, "LegR", new Vector3(0.55f * scale, 0.3f * scale, -0.2f * scale), new Vector3(0.35f, 0.3f, 0.55f) * scale, skin);
+    }
+
+    static void BuildLeech(Transform parent, float scale)
+    {
+        var body = Mat(new Color(0.45f, 0.12f, 0.18f));
+        var dark = Mat(new Color(0.2f, 0.05f, 0.08f));
+        Part(parent, PrimitiveType.Capsule, "Body", new Vector3(0f, 0.45f * scale, 0f), new Vector3(0.7f, 0.4f, 1.8f) * scale, body);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 0.5f * scale, 0.85f * scale), Vector3.one * 0.55f * scale, dark);
+        Part(parent, PrimitiveType.Sphere, "Suck", new Vector3(0f, 0.5f * scale, 1.15f * scale), Vector3.one * 0.35f * scale, Mat(new Color(0.7f, 0.15f, 0.2f)));
+        Part(parent, PrimitiveType.Sphere, "Seg1", new Vector3(0f, 0.4f * scale, -0.5f * scale), Vector3.one * 0.5f * scale, body);
+        Part(parent, PrimitiveType.Sphere, "Seg2", new Vector3(0f, 0.35f * scale, -0.95f * scale), Vector3.one * 0.4f * scale, dark);
+    }
+
+    static void BuildMosquito(Transform parent, float scale)
+    {
+        var body = Mat(new Color(0.25f, 0.35f, 0.2f));
+        var wing = Mat(new Color(0.7f, 0.85f, 0.75f));
+        Part(parent, PrimitiveType.Sphere, "Body", new Vector3(0f, 1.0f * scale, 0f), new Vector3(0.55f, 0.45f, 0.9f) * scale, body);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 1.1f * scale, 0.5f * scale), Vector3.one * 0.35f * scale, body);
+        Part(parent, PrimitiveType.Cube, "Proboscis", new Vector3(0f, 1.0f * scale, 0.85f * scale), new Vector3(0.06f, 0.06f, 0.55f) * scale, Mat(new Color(0.15f, 0.15f, 0.12f)));
+        Part(parent, PrimitiveType.Cube, "WingL", new Vector3(-0.55f * scale, 1.2f * scale, 0f), new Vector3(0.8f, 0.05f, 0.45f) * scale, wing);
+        Part(parent, PrimitiveType.Cube, "WingR", new Vector3(0.55f * scale, 1.2f * scale, 0f), new Vector3(0.8f, 0.05f, 0.45f) * scale, wing);
+        Part(parent, PrimitiveType.Capsule, "LegL1", new Vector3(-0.25f * scale, 0.55f * scale, 0.15f * scale), new Vector3(0.08f, 0.35f, 0.08f) * scale, body);
+        Part(parent, PrimitiveType.Capsule, "LegR1", new Vector3(0.25f * scale, 0.55f * scale, 0.15f * scale), new Vector3(0.08f, 0.35f, 0.08f) * scale, body);
+    }
+
+    static void BuildHarpy(Transform parent, float scale)
+    {
+        var skin = Mat(new Color(0.75f, 0.55f, 0.45f));
+        var feather = Mat(new Color(0.45f, 0.55f, 0.75f));
+        Part(parent, PrimitiveType.Capsule, "Body", new Vector3(0f, 1.1f * scale, 0f), new Vector3(0.65f, 0.7f, 0.5f) * scale, skin);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 1.95f * scale, 0f), Vector3.one * 0.45f * scale, skin);
+        Part(parent, PrimitiveType.Cube, "WingL", new Vector3(-0.85f * scale, 1.3f * scale, -0.1f * scale), new Vector3(1.2f, 0.1f, 0.7f) * scale, feather);
+        Part(parent, PrimitiveType.Cube, "WingR", new Vector3(0.85f * scale, 1.3f * scale, -0.1f * scale), new Vector3(1.2f, 0.1f, 0.7f) * scale, feather);
+        Part(parent, PrimitiveType.Cube, "TalonL", new Vector3(-0.25f * scale, 0.35f * scale, 0.1f * scale), new Vector3(0.2f, 0.35f, 0.2f) * scale, Mat(new Color(0.9f, 0.75f, 0.3f)));
+        Part(parent, PrimitiveType.Cube, "TalonR", new Vector3(0.25f * scale, 0.35f * scale, 0.1f * scale), new Vector3(0.2f, 0.35f, 0.2f) * scale, Mat(new Color(0.9f, 0.75f, 0.3f)));
+        Part(parent, PrimitiveType.Cube, "Hair", new Vector3(0f, 2.25f * scale, -0.05f * scale), new Vector3(0.5f, 0.25f, 0.4f) * scale, feather);
+    }
+
+    static void BuildStormSprite(Transform parent, float scale)
+    {
+        var glow = Mat(new Color(0.7f, 0.85f, 1f));
+        var core = Mat(new Color(1f, 1f, 1f));
+        Part(parent, PrimitiveType.Sphere, "Body", new Vector3(0f, 1.2f * scale, 0f), Vector3.one * 0.85f * scale, glow);
+        Part(parent, PrimitiveType.Sphere, "Core", new Vector3(0f, 1.2f * scale, 0f), Vector3.one * 0.4f * scale, core);
+        Part(parent, PrimitiveType.Cube, "Bolt1", new Vector3(-0.55f * scale, 1.5f * scale, 0f), new Vector3(0.12f, 0.7f, 0.12f) * scale, core);
+        Part(parent, PrimitiveType.Cube, "Bolt2", new Vector3(0.55f * scale, 0.9f * scale, 0.1f * scale), new Vector3(0.12f, 0.7f, 0.12f) * scale, core);
+        Part(parent, PrimitiveType.Cube, "Bolt3", new Vector3(0f, 1.9f * scale, -0.2f * scale), new Vector3(0.12f, 0.55f, 0.12f) * scale, glow);
+        Part(parent, PrimitiveType.Sphere, "Spark", new Vector3(0.3f * scale, 1.7f * scale, 0.35f * scale), Vector3.one * 0.2f * scale, core);
+    }
+
+    static void BuildGriffon(Transform parent, float scale)
+    {
+        var fur = Mat(new Color(0.75f, 0.6f, 0.35f));
+        var feather = Mat(new Color(0.85f, 0.85f, 0.9f));
+        Part(parent, PrimitiveType.Capsule, "Torso", new Vector3(0f, 0.9f * scale, 0f), new Vector3(0.8f, 0.55f, 1.3f) * scale, fur);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 1.4f * scale, 0.75f * scale), Vector3.one * 0.5f * scale, feather);
+        Part(parent, PrimitiveType.Cube, "Beak", new Vector3(0f, 1.3f * scale, 1.05f * scale), new Vector3(0.2f, 0.15f, 0.3f) * scale, Mat(new Color(0.95f, 0.75f, 0.2f)));
+        Part(parent, PrimitiveType.Cube, "WingL", new Vector3(-0.9f * scale, 1.2f * scale, 0f), new Vector3(1.1f, 0.1f, 0.7f) * scale, feather);
+        Part(parent, PrimitiveType.Cube, "WingR", new Vector3(0.9f * scale, 1.2f * scale, 0f), new Vector3(1.1f, 0.1f, 0.7f) * scale, feather);
+        Part(parent, PrimitiveType.Capsule, "LegFL", new Vector3(-0.3f * scale, 0.35f * scale, 0.4f * scale), new Vector3(0.18f, 0.3f, 0.18f) * scale, fur);
+        Part(parent, PrimitiveType.Capsule, "LegFR", new Vector3(0.3f * scale, 0.35f * scale, 0.4f * scale), new Vector3(0.18f, 0.3f, 0.18f) * scale, fur);
+        Part(parent, PrimitiveType.Capsule, "LegBL", new Vector3(-0.3f * scale, 0.35f * scale, -0.4f * scale), new Vector3(0.18f, 0.3f, 0.18f) * scale, fur);
+        Part(parent, PrimitiveType.Capsule, "LegBR", new Vector3(0.3f * scale, 0.35f * scale, -0.4f * scale), new Vector3(0.18f, 0.3f, 0.18f) * scale, fur);
+    }
+
+    static void BuildShadowHound(Transform parent, float scale)
+    {
+        var fur = Mat(new Color(0.12f, 0.08f, 0.16f));
+        var eye = Mat(new Color(0.9f, 0.2f, 1f));
+        Part(parent, PrimitiveType.Capsule, "Torso", new Vector3(0f, 0.7f * scale, 0f), new Vector3(0.7f, 0.45f, 1.4f) * scale, fur);
+        Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 0.95f * scale, 0.8f * scale), Vector3.one * 0.5f * scale, fur);
+        Part(parent, PrimitiveType.Cube, "Snout", new Vector3(0f, 0.85f * scale, 1.15f * scale), new Vector3(0.3f, 0.22f, 0.4f) * scale, Mat(new Color(0.08f, 0.05f, 0.1f)));
+        Part(parent, PrimitiveType.Sphere, "EyeL", new Vector3(-0.15f * scale, 1.05f * scale, 1.0f * scale), Vector3.one * 0.12f * scale, eye);
+        Part(parent, PrimitiveType.Sphere, "EyeR", new Vector3(0.15f * scale, 1.05f * scale, 1.0f * scale), Vector3.one * 0.12f * scale, eye);
+        Part(parent, PrimitiveType.Capsule, "LegFL", new Vector3(-0.28f * scale, 0.3f * scale, 0.45f * scale), new Vector3(0.15f, 0.28f, 0.15f) * scale, fur);
+        Part(parent, PrimitiveType.Capsule, "LegFR", new Vector3(0.28f * scale, 0.3f * scale, 0.45f * scale), new Vector3(0.15f, 0.28f, 0.15f) * scale, fur);
+        Part(parent, PrimitiveType.Capsule, "LegBL", new Vector3(-0.28f * scale, 0.3f * scale, -0.45f * scale), new Vector3(0.15f, 0.28f, 0.15f) * scale, fur);
+        Part(parent, PrimitiveType.Capsule, "LegBR", new Vector3(0.28f * scale, 0.3f * scale, -0.45f * scale), new Vector3(0.15f, 0.28f, 0.15f) * scale, fur);
+        Part(parent, PrimitiveType.Cube, "Tail", new Vector3(0f, 0.75f * scale, -0.95f * scale), new Vector3(0.12f, 0.12f, 0.6f) * scale, fur);
+    }
+
+    static void BuildVoidEye(Transform parent, float scale)
+    {
+        var shell = Mat(new Color(0.2f, 0.08f, 0.28f));
+        var iris = Mat(new Color(0.85f, 0.25f, 1f));
+        var pupil = Mat(Color.black);
+        Part(parent, PrimitiveType.Sphere, "Body", new Vector3(0f, 1.2f * scale, 0f), Vector3.one * 1.4f * scale, shell);
+        Part(parent, PrimitiveType.Sphere, "Iris", new Vector3(0f, 1.2f * scale, 0.55f * scale), Vector3.one * 0.7f * scale, iris);
+        Part(parent, PrimitiveType.Sphere, "Pupil", new Vector3(0f, 1.2f * scale, 0.85f * scale), Vector3.one * 0.35f * scale, pupil);
+        Part(parent, PrimitiveType.Cube, "Tendril1", new Vector3(-0.7f * scale, 0.5f * scale, 0f), new Vector3(0.15f, 0.9f, 0.15f) * scale, shell);
+        Part(parent, PrimitiveType.Cube, "Tendril2", new Vector3(0.7f * scale, 0.5f * scale, 0.1f * scale), new Vector3(0.15f, 0.9f, 0.15f) * scale, shell);
+        Part(parent, PrimitiveType.Cube, "Tendril3", new Vector3(0f, 0.4f * scale, -0.6f * scale), new Vector3(0.15f, 0.8f, 0.15f) * scale, shell);
+    }
+
+    static void BuildTentacle(Transform parent, float scale)
+    {
+        var flesh = Mat(new Color(0.45f, 0.15f, 0.35f));
+        var tip = Mat(new Color(0.7f, 0.2f, 0.55f));
+        Part(parent, PrimitiveType.Capsule, "Base", new Vector3(0f, 0.6f * scale, 0f), new Vector3(0.9f, 0.6f, 0.9f) * scale, flesh);
+        Part(parent, PrimitiveType.Capsule, "Mid", new Vector3(0.15f * scale, 1.5f * scale, 0.1f * scale), new Vector3(0.7f, 0.7f, 0.7f) * scale, flesh);
+        Part(parent, PrimitiveType.Capsule, "Upper", new Vector3(-0.1f * scale, 2.3f * scale, 0.2f * scale), new Vector3(0.55f, 0.6f, 0.55f) * scale, tip);
+        Part(parent, PrimitiveType.Sphere, "Mouth", new Vector3(-0.1f * scale, 2.85f * scale, 0.35f * scale), Vector3.one * 0.4f * scale, Mat(new Color(0.15f, 0.05f, 0.1f)));
+        Part(parent, PrimitiveType.Cube, "ArmL", new Vector3(-0.7f * scale, 1.2f * scale, 0.3f * scale), new Vector3(0.25f, 1.0f, 0.25f) * scale, tip);
+        Part(parent, PrimitiveType.Cube, "ArmR", new Vector3(0.7f * scale, 1.0f * scale, 0.2f * scale), new Vector3(0.25f, 1.0f, 0.25f) * scale, tip);
     }
 }
