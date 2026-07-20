@@ -1,0 +1,222 @@
+using UnityEngine;
+
+/// <summary>
+/// Central balance sheet for the 5-world adventure.
+/// contentLevel = (world-1)*4 + map  →  range 1..20
+/// Design goal: ~2-4 hours to clear all worlds; gear crafting is the main gate.
+/// </summary>
+public static class ProgressionFormulas
+{
+    public const int WorldCount = 5;
+    public const int MapsPerWorld = 4;
+
+    public static int ContentLevel(int world, int map)
+    {
+        world = Mathf.Clamp(world, 1, WorldCount);
+        map = Mathf.Clamp(map, 1, MapsPerWorld);
+        return (world - 1) * MapsPerWorld + map;
+    }
+
+    public static float RarityMult(ItemRarity rarity)
+    {
+        switch (rarity)
+        {
+            case ItemRarity.Common: return 1.00f;
+            case ItemRarity.Uncommon: return 1.15f;
+            case ItemRarity.Rare: return 1.35f;
+            case ItemRarity.Epic: return 1.60f;
+            case ItemRarity.Legendary: return 2.00f;
+            default: return 1f;
+        }
+    }
+
+    // ---- Monster scaling ----
+    public static float MobMaxHp(int contentLevel, bool isBoss)
+    {
+        float hp = 45f + contentLevel * 28f + Mathf.Pow(contentLevel, 1.35f) * 6f;
+        return isBoss ? hp * 4.5f : hp;
+    }
+
+    public static float MobAttack(int contentLevel, bool isBoss)
+    {
+        float atk = 7f + contentLevel * 3.2f + contentLevel * contentLevel * 0.08f;
+        return isBoss ? atk * 1.8f : atk;
+    }
+
+    public static float MobMoveSpeed(int contentLevel, bool isBoss)
+    {
+        float spd = 2.2f + contentLevel * 0.06f;
+        return isBoss ? spd * 0.9f : spd;
+    }
+
+    public static string MobDisplayName(int contentLevel, bool isBoss, EnemyKind kind)
+    {
+        string prefix = isBoss ? "Boss·" : "";
+        string name;
+        switch (kind)
+        {
+            case EnemyKind.Slime: name = "史萊姆"; break;
+            case EnemyKind.Goblin: name = "哥布林"; break;
+            case EnemyKind.Skeleton: name = "骷髏兵"; break;
+            case EnemyKind.Wolf: name = "野狼"; break;
+            case EnemyKind.Spider: name = "毒蛛"; break;
+            case EnemyKind.Bat: name = "血蝠"; break;
+            case EnemyKind.Mushroom: name = "蘑菇怪"; break;
+            case EnemyKind.Golem: name = "石魔像"; break;
+            case EnemyKind.Ghost: name = "遊魂"; break;
+            case EnemyKind.Imp: name = "小惡魔"; break;
+            case EnemyKind.Beetle: name = "甲蟲"; break;
+            case EnemyKind.Treant: name = "樹人"; break;
+            case EnemyKind.LavaSpawn: name = "熔岩怪"; break;
+            case EnemyKind.Crystal: name = "水晶魔"; break;
+            case EnemyKind.Wraith: name = "死靈"; break;
+            case EnemyKind.Demon: name = "惡魔"; break;
+            case EnemyKind.WorldBoss: return "世界首領 Lv" + contentLevel;
+            default: name = "怪物"; break;
+        }
+        return prefix + name + " Lv" + contentLevel;
+    }
+
+    // ---- Item stats ----
+    public static int RollItemLevel(int contentLevel, bool fromBoss)
+    {
+        int baseLv = contentLevel;
+        int roll = Random.Range(-1, 3); // -1..2
+        if (fromBoss) roll += 2;
+        return Mathf.Clamp(baseLv + roll, 1, 40);
+    }
+
+    public static ItemRarity RollRarity(int contentLevel, bool fromBoss)
+    {
+        float t = contentLevel / 20f;
+        float r = Random.value;
+        if (fromBoss) r -= 0.25f;
+
+        if (r < 0.02f + t * 0.03f) return ItemRarity.Legendary;
+        if (r < 0.08f + t * 0.08f) return ItemRarity.Epic;
+        if (r < 0.22f + t * 0.12f) return ItemRarity.Rare;
+        if (r < 0.50f + t * 0.10f) return ItemRarity.Uncommon;
+        return ItemRarity.Common;
+    }
+
+    public static float WeaponAttack(int itemLevel, ItemRarity rarity)
+    {
+        return (6f + itemLevel * 2.6f + itemLevel * itemLevel * 0.04f) * RarityMult(rarity);
+    }
+
+    public static float ArmorDefense(int itemLevel, ItemRarity rarity)
+    {
+        return (3f + itemLevel * 1.8f + itemLevel * 0.05f) * RarityMult(rarity);
+    }
+
+    public static float ArmorMaxHp(int itemLevel, ItemRarity rarity)
+    {
+        return (12f + itemLevel * 9f + itemLevel * itemLevel * 0.15f) * RarityMult(rarity);
+    }
+
+    /// <summary>Incoming damage after defense. Soft diminishing returns.</summary>
+    public static float MitigateDamage(float rawDamage, float defense)
+    {
+        return rawDamage * (100f / (100f + Mathf.Max(0f, defense)));
+    }
+
+    // ---- Crafting ----
+    /// <summary>
+    /// 3 items same slot → 1 upgraded item.
+    /// Level = average + 2 (or +3 if all Rare+). Keeps best rarity among inputs, 15% chance to bump.
+    /// </summary>
+    public static ItemInstance Synthesize(ItemInstance a, ItemInstance b, ItemInstance c)
+    {
+        if (a == null || b == null || c == null) return null;
+        if (a.slot != b.slot || b.slot != c.slot) return null;
+
+        int avg = Mathf.RoundToInt((a.itemLevel + b.itemLevel + c.itemLevel) / 3f);
+        int bonus = 2;
+        if (a.rarity >= ItemRarity.Rare && b.rarity >= ItemRarity.Rare && c.rarity >= ItemRarity.Rare)
+            bonus = 3;
+
+        ItemRarity best = a.rarity;
+        if (b.rarity > best) best = b.rarity;
+        if (c.rarity > best) best = c.rarity;
+        if (Random.value < 0.15f && best < ItemRarity.Legendary)
+            best = (ItemRarity)((int)best + 1);
+
+        int newLevel = Mathf.Clamp(avg + bonus, 1, 40);
+        return ItemFactory.Create(a.slot, newLevel, best);
+    }
+
+    public static string WorldThemeName(int world)
+    {
+        switch (world)
+        {
+            case 1: return "草原世界";
+            case 2: return "森林世界";
+            case 3: return "遺跡世界";
+            case 4: return "火山世界";
+            case 5: return "終焉世界";
+            default: return "未知世界";
+        }
+    }
+
+    public static string MapName(int world, int map)
+    {
+        if (map == 4) return WorldThemeName(world) + " · 首領殿堂";
+        return WorldThemeName(world) + " · 地圖 " + map;
+    }
+
+    // ---- Player XP / Level ----
+    public const int MaxPlayerLevel = 50;
+
+    public static int XpToNextLevel(int level)
+    {
+        level = Mathf.Clamp(level, 1, MaxPlayerLevel);
+        // Lv1→2 = 40, grows steadily so mid-game still feels rewarding
+        return Mathf.RoundToInt(35f + level * 28f + level * level * 1.8f);
+    }
+
+    public static int MobXpReward(int contentLevel, bool isBoss)
+    {
+        int xp = 12 + contentLevel * 8 + contentLevel * contentLevel / 4;
+        return isBoss ? xp * 5 : xp;
+    }
+
+    public static float PlayerLevelBonusAtk(int level) => (level - 1) * 2.2f;
+    public static float PlayerLevelBonusDef(int level) => (level - 1) * 1.4f;
+    public static float PlayerLevelBonusHp(int level) => (level - 1) * 18f;
+}
+
+public enum EnemyKind
+{
+    Slime,
+    Goblin,
+    Skeleton,
+    Wolf,
+    Spider,
+    Bat,
+    Mushroom,
+    Golem,
+    Ghost,
+    Imp,
+    Beetle,
+    Treant,
+    LavaSpawn,
+    Crystal,
+    Wraith,
+    Demon,
+    WorldBoss
+}
+
+public enum ItemSlot
+{
+    Weapon,
+    Armor
+}
+
+public enum ItemRarity
+{
+    Common = 0,
+    Uncommon = 1,
+    Rare = 2,
+    Epic = 3,
+    Legendary = 4
+}
