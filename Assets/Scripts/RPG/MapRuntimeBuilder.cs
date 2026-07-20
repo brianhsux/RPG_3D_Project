@@ -11,6 +11,9 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     public const float WorldSize = 80f;
 
+    [Tooltip("Optional. If empty, loads Resources/VisualPrefabCatalog.")]
+    public VisualPrefabCatalog catalog;
+
     Transform _root;
     GameObject _worldPortal;
     readonly Vector3[] _zoneCenters = new Vector3[5]; // 1..4
@@ -18,12 +21,19 @@ public class MapRuntimeBuilder : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        if (catalog != null)
+            VisualPrefabCatalog.Active = catalog;
+        else if (VisualPrefabCatalog.Active == null)
+            VisualPrefabCatalog.Get();
+
         // Four scenic zones inside the big square
         _zoneCenters[1] = new Vector3(-24f, 0f, 0f);   // West  - Map1
         _zoneCenters[2] = new Vector3(24f, 0f, 0f);    // East  - Map2
         _zoneCenters[3] = new Vector3(0f, 0f, 24f);    // North - Map3
         _zoneCenters[4] = new Vector3(0f, 0f, -22f);   // South - Map4 Boss
     }
+
+    VisualPrefabCatalog Cat => catalog != null ? catalog : VisualPrefabCatalog.Get();
 
     void OnDestroy()
     {
@@ -188,41 +198,160 @@ public class MapRuntimeBuilder : MonoBehaviour
         var wood = MakeTempMat(new Color(0.4f, 0.25f, 0.12f));
         var stone = MakeTempMat(ThemeWall(world));
         var leaf = MakeTempMat(new Color(0.15f, 0.5f, 0.2f));
+        var cat = Cat;
 
         switch (map)
         {
             case 1: // Village
                 BuildHouse(parent, center + new Vector3(-4f, 0f, 3f), wood, stone);
                 BuildHouse(parent, center + new Vector3(4f, 0f, -2f), wood, stone);
-                Prim(PrimitiveType.Cube, "Stall", center + new Vector3(0f, 0.6f, 5f), new Vector3(2.2f, 1.2f, 1.4f), wood, parent);
+                if (cat == null || !TryDecor(cat.stallPrefab, "Stall", center + new Vector3(0f, 0f, 5f), cat.stallScale, parent))
+                    Prim(PrimitiveType.Cube, "Stall", center + new Vector3(0f, 0.6f, 5f), new Vector3(2.2f, 1.2f, 1.4f), wood, parent);
+                BuildVillageFences(parent, center, cat);
+                if (cat != null && cat.bridgePrefab != null)
+                    TryDecor(cat.bridgePrefab, "Bridge", center + new Vector3(0f, 0f, -7f), cat.bridgeScale, parent, 90f);
+                ScatterNature(parent, center, cat, bushes: 3, rocks: 2, mushrooms: 1, grass: 4, trees: 1, stumps: 0);
                 break;
             case 2: // Forest
-                for (int i = 0; i < 7; i++)
+            {
+                int treeCount = cat != null && cat.PickTree() != null ? 10 : 7;
+                for (int i = 0; i < treeCount; i++)
                 {
-                    Vector3 p = center + new Vector3(Random.Range(-6f, 6f), 0f, Random.Range(-6f, 6f));
-                    Prim(PrimitiveType.Cylinder, "Trunk" + i, p + Vector3.up * 1.1f, new Vector3(0.4f, 1.1f, 0.4f), wood, parent);
-                    Prim(PrimitiveType.Sphere, "Canopy" + i, p + Vector3.up * 2.5f, Vector3.one * 1.9f, leaf, parent);
+                    Vector3 p = center + new Vector3(Random.Range(-7f, 7f), 0f, Random.Range(-7f, 7f));
+                    var tree = cat != null ? cat.PickTree() : null;
+                    if (tree != null)
+                        TryDecor(tree, "Tree" + i, p, cat.treeScale, parent);
+                    else
+                    {
+                        Prim(PrimitiveType.Cylinder, "Trunk" + i, p + Vector3.up * 1.1f, new Vector3(0.4f, 1.1f, 0.4f), wood, parent);
+                        Prim(PrimitiveType.Sphere, "Canopy" + i, p + Vector3.up * 2.5f, Vector3.one * 1.9f, leaf, parent);
+                    }
                 }
+                ScatterNature(parent, center, cat, bushes: 6, rocks: 4, mushrooms: 4, grass: 10, trees: 0, stumps: 2);
                 break;
+            }
             case 3: // Ruins
-                Prim(PrimitiveType.Cube, "RuinWall", center + new Vector3(-3f, 1.1f, 2f), new Vector3(5f, 2.2f, 0.5f), stone, parent);
-                Prim(PrimitiveType.Cube, "RuinPillar", center + new Vector3(4f, 1.5f, -1f), new Vector3(1f, 3f, 1f), stone, parent);
-                Prim(PrimitiveType.Cube, "Rubble", center + new Vector3(1f, 0.35f, 4f), new Vector3(2.5f, 0.7f, 1.5f), stone, parent);
+                if (cat == null || !TryDecor(cat.ruinWallPrefab, "RuinWall", center + new Vector3(-3f, 0f, 2f), cat.ruinScale, parent))
+                    Prim(PrimitiveType.Cube, "RuinWall", center + new Vector3(-3f, 1.1f, 2f), new Vector3(5f, 2.2f, 0.5f), stone, parent);
+                if (cat == null || !TryDecor(cat.ruinPillarPrefab, "RuinPillar", center + new Vector3(4f, 0f, -1f), cat.ruinScale, parent))
+                    Prim(PrimitiveType.Cube, "RuinPillar", center + new Vector3(4f, 1.5f, -1f), new Vector3(1f, 3f, 1f), stone, parent);
+                if (cat != null && cat.PickRock() != null)
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        Vector3 p = center + new Vector3(Random.Range(-5f, 5f), 0f, Random.Range(-5f, 5f));
+                        TryDecor(cat.PickRock(), "Rubble" + i, p, cat.rockScale, parent);
+                    }
+                }
+                else if (cat == null || !TryDecor(cat.rubblePrefab, "Rubble", center + new Vector3(1f, 0f, 4f), cat != null ? cat.ruinScale : 1f, parent))
+                    Prim(PrimitiveType.Cube, "Rubble", center + new Vector3(1f, 0.35f, 4f), new Vector3(2.5f, 0.7f, 1.5f), stone, parent);
+                ScatterNature(parent, center, cat, bushes: 1, rocks: 0, mushrooms: 0, grass: 2, trees: 1, stumps: 1);
                 break;
             case 4: // Boss arena
-                Prim(PrimitiveType.Cube, "BossAltar", center + new Vector3(0f, 0.4f, 2f), new Vector3(6f, 0.8f, 6f),
-                    MakeTempMat(new Color(0.55f, 0.12f, 0.12f)), parent);
+                if (cat == null || !TryDecor(cat.bossAltarPrefab, "BossAltar", center + new Vector3(0f, 0f, 2f), cat.bossAltarScale, parent))
+                {
+                    Prim(PrimitiveType.Cube, "BossAltar", center + new Vector3(0f, 0.4f, 2f), new Vector3(6f, 0.8f, 6f),
+                        MakeTempMat(new Color(0.55f, 0.12f, 0.12f)), parent);
+                }
                 Prim(PrimitiveType.Cylinder, "BossRing", center + new Vector3(0f, 0.05f, 2f), new Vector3(10f, 0.06f, 10f),
                     MakeTempMat(new Color(0.35f, 0.08f, 0.08f)), parent);
                 if (world == 4)
                     Prim(PrimitiveType.Cylinder, "Lava", center + new Vector3(6f, 0.03f, -4f), new Vector3(4f, 0.05f, 4f),
                         MakeTempMat(new Color(1f, 0.35f, 0.05f)), parent);
+                ScatterNature(parent, center, cat, bushes: 0, rocks: 5, mushrooms: 0, grass: 0, trees: 0, stumps: 0);
                 break;
         }
     }
 
+    void ScatterNature(Transform parent, Vector3 center, VisualPrefabCatalog cat,
+        int bushes, int rocks, int mushrooms, int grass, int trees, int stumps)
+    {
+        if (cat == null) return;
+
+        for (int i = 0; i < bushes; i++)
+        {
+            var p = cat.PickBush();
+            if (p == null) break;
+            TryDecor(p, "Bush" + i, center + RandOffset(6.5f), cat.bushScale, parent);
+        }
+        for (int i = 0; i < rocks; i++)
+        {
+            var p = cat.PickRock();
+            if (p == null) break;
+            TryDecor(p, "Rock" + i, center + RandOffset(6.5f), cat.rockScale, parent);
+        }
+        for (int i = 0; i < mushrooms; i++)
+        {
+            var p = cat.PickMushroom();
+            if (p == null) break;
+            TryDecor(p, "Mushroom" + i, center + RandOffset(5.5f), cat.mushroomScale, parent);
+        }
+        for (int i = 0; i < grass; i++)
+        {
+            var p = cat.PickGrass();
+            if (p == null) break;
+            TryDecor(p, "Grass" + i, center + RandOffset(7f), cat.grassScale, parent);
+        }
+        for (int i = 0; i < trees; i++)
+        {
+            var p = cat.PickTree();
+            if (p == null) break;
+            TryDecor(p, "ExtraTree" + i, center + RandOffset(6f), cat.treeScale, parent);
+        }
+        for (int i = 0; i < stumps; i++)
+        {
+            if (cat.stumpPrefab == null) break;
+            TryDecor(cat.stumpPrefab, "Stump" + i, center + RandOffset(5f), cat.stumpScale, parent);
+        }
+    }
+
+    void BuildVillageFences(Transform parent, Vector3 center, VisualPrefabCatalog cat)
+    {
+        if (cat == null) return;
+
+        // South opening with gate toward the hub path.
+        PlaceFenceRow(parent, cat, center + new Vector3(-6f, 0f, -6f), 4, 3f, 0f, "FenceS");
+        if (cat.gatePrefab != null)
+            TryDecor(cat.gatePrefab, "Gate", center + new Vector3(0f, 0f, -6f), cat.gateScale, parent, 0f);
+        else
+            PlaceFenceRow(parent, cat, center + new Vector3(0f, 0f, -6f), 1, 0f, 0f, "FenceSMid");
+        PlaceFenceRow(parent, cat, center + new Vector3(3f, 0f, -6f), 3, 3f, 0f, "FenceSE");
+
+        PlaceFenceRow(parent, cat, center + new Vector3(-6f, 0f, 6f), 5, 3f, 180f, "FenceN");
+        PlaceFenceRow(parent, cat, center + new Vector3(-6f, 0f, -3f), 4, 3f, 90f, "FenceW");
+        PlaceFenceRow(parent, cat, center + new Vector3(6f, 0f, -3f), 4, 3f, -90f, "FenceE");
+    }
+
+    void PlaceFenceRow(Transform parent, VisualPrefabCatalog cat, Vector3 start, int count, float spacing, float yaw, string namePrefix)
+    {
+        Vector3 step = Quaternion.Euler(0f, yaw, 0f) * Vector3.right * spacing;
+        for (int i = 0; i < count; i++)
+        {
+            var fence = cat.PickFence();
+            if (fence == null) return;
+            TryDecor(fence, namePrefix + i, start + step * i, cat.fenceScale, parent, yaw);
+        }
+    }
+
+    static Vector3 RandOffset(float range)
+    {
+        return new Vector3(Random.Range(-range, range), 0f, Random.Range(-range, range));
+    }
+
+    bool TryDecor(GameObject prefab, string name, Vector3 worldPos, float scale, Transform parent, float yawDegrees = 0f)
+    {
+        if (prefab == null) return false;
+        var go = VisualPrefabUtil.Spawn(prefab, parent, name, worldPos, scale <= 0f ? 1f : scale, stripColliders: false);
+        if (go != null && Mathf.Abs(yawDegrees) > 0.01f)
+            go.transform.rotation = Quaternion.Euler(0f, yawDegrees, 0f);
+        return go != null;
+    }
+
     void BuildHouse(Transform parent, Vector3 pos, Material wood, Material roof)
     {
+        var cat = Cat;
+        if (cat != null && TryDecor(cat.housePrefab, "House", pos, cat.houseScale, parent))
+            return;
         Prim(PrimitiveType.Cube, "HouseBase", pos + new Vector3(0f, 1.0f, 0f), new Vector3(3.2f, 2.0f, 2.8f), wood, parent);
         Prim(PrimitiveType.Cube, "HouseRoof", pos + new Vector3(0f, 2.3f, 0f), new Vector3(3.6f, 0.5f, 3.2f), roof, parent);
     }
@@ -312,9 +441,19 @@ public class MapRuntimeBuilder : MonoBehaviour
         if (_root == null || _worldPortal != null) return;
 
         Vector3 center = GetTileCenter(4);
-        var mat = MakeTempMat(new Color(0.55f, 0.35f, 1f));
-        _worldPortal = Prim(PrimitiveType.Cylinder, "WorldPortal", center + new Vector3(0f, 1.5f, -6f), new Vector3(3f, 1.5f, 0.4f), mat);
-        Object.Destroy(_worldPortal.GetComponent<Collider>());
+        var cat = Cat;
+        if (cat != null && cat.worldPortalPrefab != null)
+        {
+            _worldPortal = VisualPrefabUtil.Spawn(
+                cat.worldPortalPrefab, _root, "WorldPortal",
+                center + new Vector3(0f, 0f, -6f), cat.worldPortalScale, stripColliders: true);
+        }
+        else
+        {
+            var mat = MakeTempMat(new Color(0.55f, 0.35f, 1f));
+            _worldPortal = Prim(PrimitiveType.Cylinder, "WorldPortal", center + new Vector3(0f, 1.5f, -6f), new Vector3(3f, 1.5f, 0.4f), mat);
+            Object.Destroy(_worldPortal.GetComponent<Collider>());
+        }
 
         var trigger = new GameObject("WorldPortalTrigger");
         trigger.transform.SetParent(_root, false);

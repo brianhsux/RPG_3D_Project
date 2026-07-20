@@ -7,6 +7,19 @@ public static class EnemyVisuals
 {
     public static void Build(Transform root, EnemyKind kind, float scale)
     {
+        var catalog = VisualPrefabCatalog.Get();
+        if (catalog != null)
+        {
+            float mul;
+            var prefab = catalog.GetEnemyPrefab(kind, out mul);
+            if (prefab != null)
+            {
+                VisualPrefabUtil.SpawnLocal(
+                    prefab, root, "Model", Vector3.zero, Vector3.zero, scale * mul, stripColliders: true);
+                return;
+            }
+        }
+
         switch (kind)
         {
             case EnemyKind.Goblin: BuildGoblin(root, scale); break;

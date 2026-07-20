@@ -1,14 +1,18 @@
 using UnityEngine;
 
 /// <summary>
-/// Recolors the player body mesh by armor tier — same shape, different colors only.
+/// Recolors the player body mesh by armor tier, or swaps in catalog prefabs when assigned.
 /// </summary>
 public class PlayerArmorVisual : MonoBehaviour
 {
     Transform _body;
+    Transform _gearRoot;
     int _lastStyle = -1;
     ItemRarity _lastRarity = (ItemRarity)(-1);
     Color _baseBodyColor = new Color(0.25f, 0.55f, 0.95f);
+    bool _usingPrefab;
+
+    static readonly string[] KeepVisible = { "Sword", "Hilt", "ArmorGear" };
 
     void Awake()
     {
@@ -24,12 +28,27 @@ public class PlayerArmorVisual : MonoBehaviour
                     _baseBodyColor = r.sharedMaterial.color;
             }
         }
+        EnsureGearRoot();
+    }
+
+    void EnsureGearRoot()
+    {
+        if (_gearRoot != null) return;
+        var existing = transform.Find("ArmorGear");
+        if (existing != null)
+        {
+            _gearRoot = existing;
+            return;
+        }
+        var go = new GameObject("ArmorGear");
+        go.transform.SetParent(transform, false);
+        _gearRoot = go.transform;
     }
 
     void LateUpdate()
     {
         var inv = GetComponent<PlayerInventory>();
-        if (inv == null || _body == null) return;
+        if (inv == null) return;
 
         var armor = inv.equippedArmor;
         int style = armor != null ? ArmorVisualUtil.StyleIndex(armor.itemLevel) : -1;
@@ -38,16 +57,52 @@ public class PlayerArmorVisual : MonoBehaviour
         _lastStyle = style;
         _lastRarity = rarity;
 
-        if (armor == null)
-            SetColor(_body, _baseBodyColor);
-        else
-            SetColor(_body, ArmorVisualUtil.BodyColor(style, rarity));
+        Apply(style, rarity, armor == null);
     }
 
     public void ForceRebuild()
     {
         _lastStyle = -999;
         LateUpdate();
+    }
+
+    void Apply(int style, ItemRarity rarity, bool unequipped)
+    {
+        EnsureGearRoot();
+        ClearGear();
+
+        Color tint = unequipped ? _baseBodyColor : ArmorVisualUtil.BodyColor(style, rarity);
+        var catalog = VisualPrefabCatalog.Get();
+        GameObject prefab = catalog != null ? catalog.GetArmorPrefab(style) : null;
+
+        if (prefab != null)
+        {
+            var mesh = VisualPrefabUtil.SpawnLocal(
+                prefab, _gearRoot, "ArmorMesh",
+                catalog.armorLocalPosition, catalog.armorLocalEuler,
+                catalog.armorPrefabScale, stripColliders: true);
+            _usingPrefab = true;
+            VisualPrefabUtil.SetPrimitiveRenderersEnabled(transform, false, KeepVisible);
+            if (mesh != null && catalog.tintArmorPrefab)
+                VisualPrefabUtil.TintRenderers(mesh.transform, tint);
+            return;
+        }
+
+        if (_usingPrefab)
+        {
+            VisualPrefabUtil.SetPrimitiveRenderersEnabled(transform, true, KeepVisible);
+            _usingPrefab = false;
+        }
+
+        if (_body == null) return;
+        SetColor(_body, tint);
+    }
+
+    void ClearGear()
+    {
+        if (_gearRoot == null) return;
+        for (int i = _gearRoot.childCount - 1; i >= 0; i--)
+            Destroy(_gearRoot.GetChild(i).gameObject);
     }
 
     static void SetColor(Transform t, Color color)

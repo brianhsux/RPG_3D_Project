@@ -113,6 +113,22 @@ public class PlayerWeaponVisual : MonoBehaviour
 
         _root.localScale = Vector3.one * size;
 
+        var catalog = VisualPrefabCatalog.Get();
+        if (catalog != null)
+        {
+            var prefab = catalog.GetWeaponPrefab(style);
+            if (prefab != null)
+            {
+                var mesh = VisualPrefabUtil.SpawnLocal(
+                    prefab, _root, "WeaponMesh",
+                    catalog.weaponLocalPosition, catalog.weaponLocalEuler,
+                    catalog.weaponPrefabScale, stripColliders: true);
+                if (mesh != null && catalog.tintWeaponPrefab)
+                    VisualPrefabUtil.TintRenderers(mesh.transform, blade);
+                return;
+            }
+        }
+
         switch (style)
         {
             case 1: BuildIronSword(blade, accent, grip); break;
