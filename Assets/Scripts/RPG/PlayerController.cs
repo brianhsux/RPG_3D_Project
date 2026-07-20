@@ -8,6 +8,8 @@ public class PlayerController : MonoBehaviour
     public float moveSpeed = 6.5f;
     public float gravity = -20f;
     public float rotateSpeed = 12f;
+    [Tooltip("Jump apex height in meters.")]
+    public float jumpHeight = 1.75f;
 
     CharacterController _controller;
     CharacterStats _stats;
@@ -15,6 +17,7 @@ public class PlayerController : MonoBehaviour
     ProceduralBodyAnim _bodyAnim;
     Vector3 _velocity;
     float _attackAnimT;
+    bool _jumpQueued;
 
     void Awake()
     {
@@ -65,6 +68,9 @@ public class PlayerController : MonoBehaviour
         Vector3 input = new Vector3(move.x, 0f, move.y);
         if (input.sqrMagnitude > 1f) input.Normalize();
 
+        if (WasJumpPressed())
+            _jumpQueued = true;
+
         if (input.sqrMagnitude > 0.01f)
         {
             Quaternion targetRot = Quaternion.LookRotation(input, Vector3.up);
@@ -72,15 +78,32 @@ public class PlayerController : MonoBehaviour
             _controller.Move(input * moveSpeed * Time.deltaTime);
         }
 
-        if (_bodyAnim != null)
-            _bodyAnim.SetMoveAmount(input.sqrMagnitude > 0.01f ? 1f : 0f);
-
-        if (_controller.isGrounded && _velocity.y < 0f)
+        bool grounded = _controller.isGrounded;
+        if (grounded && _velocity.y < 0f)
             _velocity.y = -2f;
+
+        if (_jumpQueued && grounded)
+        {
+            // v = sqrt(2 * g * h); gravity is negative
+            _velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            _jumpQueued = false;
+            if (_bodyAnim != null) _bodyAnim.PlayJump();
+        }
+        else if (grounded)
+        {
+            _jumpQueued = false;
+        }
+
         _velocity.y += gravity * Time.deltaTime;
         _controller.Move(_velocity * Time.deltaTime);
 
-        // Auto-attack when an enemy is in range (Space / click still works)
+        if (_bodyAnim != null)
+        {
+            _bodyAnim.SetMoveAmount(input.sqrMagnitude > 0.01f ? 1f : 0f);
+            _bodyAnim.SetGrounded(grounded);
+        }
+
+        // Auto-attack in range; click still forces an attack attempt
         if (HasEnemyInAttackRange() || WasAttackPressed())
             TryAttack();
 
@@ -107,14 +130,27 @@ public class PlayerController : MonoBehaviour
         return new Vector2(x, y);
     }
 
-    static bool WasAttackPressed()
+    static bool WasJumpPressed()
     {
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
             return true;
 
+        var gamepad = Gamepad.current;
+        if (gamepad != null && gamepad.buttonSouth.wasPressedThisFrame)
+            return true;
+
+        return false;
+    }
+
+    static bool WasAttackPressed()
+    {
         var mouse = Mouse.current;
         if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+            return true;
+
+        var keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.fKey.wasPressedThisFrame)
             return true;
 
         return false;
@@ -240,7 +276,7 @@ public class PlayerController : MonoBehaviour
         }
 
         GUI.Label(new Rect(20f, 400f, 980f, RPGUI.HintH),
-            "WASD 移動｜靠近自動攻擊｜1-4 瞬移區域｜I 背包", RPGUI.Hint);
+            "WASD 移動｜空白鍵跳躍｜靠近自動攻擊｜1-4 瞬移｜I 背包", RPGUI.Hint);
 
         if (_stats.isDead)
         {

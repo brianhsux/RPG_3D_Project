@@ -22,9 +22,11 @@ public class ProceduralBodyAnim : MonoBehaviour
     readonly List<Part> _parts = new List<Part>();
     float _phase;
     float _attackT;
+    float _jumpT;
     float _moveAmount;
     float _targetMove;
     bool _dead;
+    bool _grounded = true;
 
     struct Part
     {
@@ -85,6 +87,16 @@ public class ProceduralBodyAnim : MonoBehaviour
     public void SetMoveAmount(float amount01)
     {
         _targetMove = Mathf.Clamp01(amount01);
+    }
+
+    public void SetGrounded(bool grounded)
+    {
+        _grounded = grounded;
+    }
+
+    public void PlayJump(float duration = 0.35f)
+    {
+        _jumpT = Mathf.Max(_jumpT, duration);
     }
 
     public void PlayAttack(float duration = 0.35f)
@@ -198,26 +210,29 @@ public class ProceduralBodyAnim : MonoBehaviour
 
         if (_attackT > 0f)
             _attackT -= Time.deltaTime;
+        if (_jumpT > 0f)
+            _jumpT -= Time.deltaTime;
 
         float attack = _attackT > 0f ? Mathf.Clamp01(_attackT / 0.35f) : 0f;
         // Attack curve: wind-up then strike
         float strike = attack > 0f ? Mathf.Sin((1f - attack) * Mathf.PI) : 0f;
+        float jump = _jumpT > 0f ? Mathf.Clamp01(_jumpT / 0.35f) : (!_grounded ? 0.55f : 0f);
 
         foreach (var p in _parts)
         {
             if (p.t == null) continue;
-            AnimatePart(p, strike);
+            AnimatePart(p, strike, jump);
         }
     }
 
-    void AnimatePart(Part p, float strike)
+    void AnimatePart(Part p, float strike, float jump)
     {
         Vector3 pos = p.restPos;
         Quaternion rot = p.restRot;
         Vector3 scale = p.restScale;
 
         float idle = 1f - _moveAmount;
-        float walk = _moveAmount;
+        float walk = _grounded ? _moveAmount : 0f;
         float bob = Mathf.Sin(_phase) * 0.04f * walk + Mathf.Sin(Time.time * 2.2f) * 0.015f * idle;
         float breath = 1f + Mathf.Sin(Time.time * 2.5f) * 0.03f * idle;
 
@@ -236,7 +251,7 @@ public class ProceduralBodyAnim : MonoBehaviour
                 AnimateCrawler(ref pos, ref rot, ref scale, p, bob, breath, walk, strike);
                 break;
             default:
-                AnimateHumanoid(ref pos, ref rot, ref scale, p, bob, breath, walk, strike);
+                AnimateHumanoid(ref pos, ref rot, ref scale, p, bob, breath, walk, strike, jump);
                 break;
         }
 
@@ -246,7 +261,7 @@ public class ProceduralBodyAnim : MonoBehaviour
     }
 
     void AnimateHumanoid(ref Vector3 pos, ref Quaternion rot, ref Vector3 scale, Part p,
-        float bob, float breath, float walk, float strike)
+        float bob, float breath, float walk, float strike, float jump)
     {
         float swing = Mathf.Sin(_phase) * 28f * walk;
         float armSwing = Mathf.Sin(_phase) * 35f * walk;
@@ -254,27 +269,27 @@ public class ProceduralBodyAnim : MonoBehaviour
         switch (p.role)
         {
             case PartRole.Body:
-                pos.y += bob * 0.35f;
+                pos.y += bob * 0.35f + jump * 0.08f;
                 scale = Vector3.Scale(p.restScale, new Vector3(breath, 1f / Mathf.Lerp(1f, breath, 0.5f), breath));
-                rot = p.restRot * Quaternion.Euler(strike * 18f, 0f, Mathf.Sin(Time.time * 1.5f) * 2f * (1f - walk));
+                rot = p.restRot * Quaternion.Euler(strike * 18f - jump * 8f, 0f, Mathf.Sin(Time.time * 1.5f) * 2f * (1f - walk));
                 break;
             case PartRole.Head:
                 pos.y += bob * 0.2f;
-                rot = p.restRot * Quaternion.Euler(Mathf.Sin(_phase * 0.5f) * 6f * walk + strike * -10f, 0f, 0f);
+                rot = p.restRot * Quaternion.Euler(Mathf.Sin(_phase * 0.5f) * 6f * walk + strike * -10f + jump * 6f, 0f, 0f);
                 break;
             case PartRole.ArmL:
-                rot = p.restRot * Quaternion.Euler(armSwing + strike * -50f, 0f, 8f + walk * 5f);
+                rot = p.restRot * Quaternion.Euler(armSwing + strike * -50f + jump * 25f, 0f, 8f + walk * 5f);
                 break;
             case PartRole.ArmR:
                 // Main attack arm
-                rot = p.restRot * Quaternion.Euler(-armSwing + strike * -70f, strike * 25f, -8f - walk * 5f);
+                rot = p.restRot * Quaternion.Euler(-armSwing + strike * -70f + jump * 20f, strike * 25f, -8f - walk * 5f);
                 break;
             case PartRole.LegL:
-                rot = p.restRot * Quaternion.Euler(-swing, 0f, 0f);
+                rot = p.restRot * Quaternion.Euler(-swing + jump * 55f, 0f, 0f);
                 pos.y += Mathf.Max(0f, Mathf.Sin(_phase) * 0.03f * walk);
                 break;
             case PartRole.LegR:
-                rot = p.restRot * Quaternion.Euler(swing, 0f, 0f);
+                rot = p.restRot * Quaternion.Euler(swing + jump * 55f, 0f, 0f);
                 pos.y += Mathf.Max(0f, Mathf.Sin(_phase + Mathf.PI) * 0.03f * walk);
                 break;
             case PartRole.WingL:
