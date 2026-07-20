@@ -89,11 +89,17 @@ public static class EnemyVisuals
     {
         var body = Mat(new Color(0.25f, 0.85f, 0.35f));
         var dark = Mat(new Color(0.1f, 0.45f, 0.2f));
+        var shine = Mat(new Color(0.75f, 1f, 0.8f));
         var eye = Mat(Color.black);
+        var white = Mat(Color.white);
         Part(parent, PrimitiveType.Sphere, "Body", new Vector3(0f, 0.7f * scale, 0f), new Vector3(1.6f, 1.2f, 1.6f) * scale, body);
         Part(parent, PrimitiveType.Sphere, "Blob", new Vector3(0.35f * scale, 0.45f * scale, 0.2f * scale), Vector3.one * 0.55f * scale, dark);
-        Part(parent, PrimitiveType.Sphere, "EyeL", new Vector3(-0.3f * scale, 1.0f * scale, 0.55f * scale), Vector3.one * 0.22f * scale, eye);
-        Part(parent, PrimitiveType.Sphere, "EyeR", new Vector3(0.3f * scale, 1.0f * scale, 0.55f * scale), Vector3.one * 0.22f * scale, eye);
+        Part(parent, PrimitiveType.Sphere, "Shine", new Vector3(-0.35f * scale, 1.05f * scale, 0.4f * scale), Vector3.one * 0.28f * scale, shine);
+        Part(parent, PrimitiveType.Sphere, "EyeL", new Vector3(-0.3f * scale, 1.0f * scale, 0.55f * scale), Vector3.one * 0.26f * scale, white);
+        Part(parent, PrimitiveType.Sphere, "EyeR", new Vector3(0.3f * scale, 1.0f * scale, 0.55f * scale), Vector3.one * 0.26f * scale, white);
+        Part(parent, PrimitiveType.Sphere, "PupilL", new Vector3(-0.3f * scale, 1.0f * scale, 0.66f * scale), Vector3.one * 0.12f * scale, eye);
+        Part(parent, PrimitiveType.Sphere, "PupilR", new Vector3(0.3f * scale, 1.0f * scale, 0.66f * scale), Vector3.one * 0.12f * scale, eye);
+        Part(parent, PrimitiveType.Sphere, "Mouth", new Vector3(0f, 0.75f * scale, 0.7f * scale), new Vector3(0.35f, 0.12f, 0.12f) * scale, dark);
     }
 
     static void BuildGoblin(Transform parent, float scale)
@@ -101,14 +107,20 @@ public static class EnemyVisuals
         var skin = Mat(new Color(0.35f, 0.6f, 0.22f));
         var cloth = Mat(new Color(0.45f, 0.2f, 0.12f));
         var dark = Mat(new Color(0.15f, 0.25f, 0.1f));
+        var eye = Mat(new Color(1f, 0.85f, 0.2f));
         Part(parent, PrimitiveType.Capsule, "Body", new Vector3(0f, 0.85f * scale, 0f), new Vector3(0.75f, 0.7f, 0.65f) * scale, cloth);
         Part(parent, PrimitiveType.Sphere, "Head", new Vector3(0f, 1.7f * scale, 0.05f * scale), Vector3.one * 0.55f * scale, skin);
         Part(parent, PrimitiveType.Cube, "EarL", new Vector3(-0.35f * scale, 1.85f * scale, 0f), new Vector3(0.12f, 0.35f, 0.08f) * scale, skin);
         Part(parent, PrimitiveType.Cube, "EarR", new Vector3(0.35f * scale, 1.85f * scale, 0f), new Vector3(0.12f, 0.35f, 0.08f) * scale, skin);
         Part(parent, PrimitiveType.Cube, "Nose", new Vector3(0f, 1.65f * scale, 0.28f * scale), new Vector3(0.12f, 0.1f, 0.2f) * scale, dark);
+        Part(parent, PrimitiveType.Sphere, "EyeL", new Vector3(-0.15f * scale, 1.75f * scale, 0.25f * scale), Vector3.one * 0.1f * scale, eye);
+        Part(parent, PrimitiveType.Sphere, "EyeR", new Vector3(0.15f * scale, 1.75f * scale, 0.25f * scale), Vector3.one * 0.1f * scale, eye);
         Part(parent, PrimitiveType.Capsule, "ArmL", new Vector3(-0.55f * scale, 1.0f * scale, 0f), new Vector3(0.25f, 0.4f, 0.25f) * scale, skin);
         Part(parent, PrimitiveType.Capsule, "ArmR", new Vector3(0.55f * scale, 1.0f * scale, 0f), new Vector3(0.25f, 0.4f, 0.25f) * scale, skin);
+        Part(parent, PrimitiveType.Capsule, "LegL", new Vector3(-0.2f * scale, 0.3f * scale, 0f), new Vector3(0.22f, 0.3f, 0.22f) * scale, dark);
+        Part(parent, PrimitiveType.Capsule, "LegR", new Vector3(0.2f * scale, 0.3f * scale, 0f), new Vector3(0.22f, 0.3f, 0.22f) * scale, dark);
         Part(parent, PrimitiveType.Cube, "Club", new Vector3(0.75f * scale, 0.7f * scale, 0.2f * scale), new Vector3(0.18f, 0.18f, 0.7f) * scale, Mat(new Color(0.4f, 0.25f, 0.12f)));
+        Part(parent, PrimitiveType.Sphere, "ClubHead", new Vector3(0.75f * scale, 0.7f * scale, 0.55f * scale), Vector3.one * 0.28f * scale, Mat(new Color(0.35f, 0.2f, 0.1f)));
     }
 
     static void BuildSkeleton(Transform parent, float scale)

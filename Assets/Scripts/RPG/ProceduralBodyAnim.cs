@@ -98,10 +98,16 @@ public class ProceduralBodyAnim : MonoBehaviour
         foreach (Transform child in GetComponentsInChildren<Transform>(true))
         {
             if (child == transform) continue;
-            // Only direct visual parts under root
-            if (child.parent != transform) continue;
+
+            // Direct children, or one level under ArmorGear / HeroVisual rebuild roots.
+            bool direct = child.parent == transform;
+            bool underGear = child.parent != null && child.parent.parent == transform &&
+                             (child.parent.name == "ArmorGear" || child.parent.name == "HeroVisual");
+            if (!direct && !underGear) continue;
+
             string nm = child.name;
-            if (nm == "Sword" || nm == "Hilt" || nm == "ArmorGear") continue;
+            if (nm == "Sword" || nm == "Hilt" || nm == "ArmorGear" || nm == "HeroVisual" || nm == "ArmorMesh")
+                continue;
 
             PartRole role = Classify(child.name);
             _parts.Add(new Part
@@ -118,6 +124,11 @@ public class ProceduralBodyAnim : MonoBehaviour
     static PartRole Classify(string name)
     {
         string n = name.ToLowerInvariant();
+
+        if (n == "leftleg" || n == "legl" || n.StartsWith("legl"))
+            return PartRole.LegL;
+        if (n == "rightleg" || n == "legr" || n.StartsWith("legr"))
+            return PartRole.LegR;
 
         if (n == "leftarm" || n == "arml" || n.StartsWith("arml"))
             return PartRole.ArmL;
