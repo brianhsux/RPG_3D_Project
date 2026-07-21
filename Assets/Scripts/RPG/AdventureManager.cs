@@ -320,6 +320,7 @@ public class AdventureManager : MonoBehaviour
     {
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady) return;
         if (IsInVillage) return;
+        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
 
         var kb = UnityEngine.InputSystem.Keyboard.current;
         if (kb == null) return;
@@ -336,8 +337,9 @@ public class AdventureManager : MonoBehaviour
 
         RPGUI.Ensure();
 
-        float panelW = 380f;
-        float panelH = IsInVillage ? 140f : 168f;
+        // Compact location chip — journey details live in I → Info.
+        float panelW = 300f;
+        float panelH = IsInVillage ? 72f : 88f;
         Rect panel = new Rect(Screen.width - panelW - 16f, 16f, panelW, panelH);
         RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
@@ -347,39 +349,21 @@ public class AdventureManager : MonoBehaviour
 
         if (IsInVillage)
         {
-            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.LabelH), "Home Village", RPGUI.Label);
+            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.LabelH), "Village", RPGUI.Label);
             y += RPGUI.LabelH;
-            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.HintH),
-                $"Hub · Worlds unlocked 1–{highestWorldUnlocked}/{ProgressionFormulas.WorldCount}",
-                RPGUI.Hint);
-            y += RPGUI.HintH + 10f;
             RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH),
-                "Walk into a lit portal to enter that world", RPGUI.FieldTag);
-            y += RPGUI.FieldTagH + 6f;
-            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH),
-                "Sealed portals open after you reach that world", RPGUI.FieldTag);
-            return;
+                $"Worlds 1–{highestWorldUnlocked}/{ProgressionFormulas.WorldCount}",
+                RPGUI.FieldTag);
         }
-
-        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.LabelH),
-            ProgressionFormulas.MapName(currentWorld, currentMap), RPGUI.Label);
-        y += RPGUI.LabelH;
-
-        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.HintH),
-            $"World {currentWorld}/{ProgressionFormulas.WorldCount} · Zone {currentMap}/4 · Power Lv{ContentLevel}",
-            RPGUI.Hint);
-        y += RPGUI.HintH + 6f;
-
-        RPGUI.DrawMapDots(new Rect(x, y, 160f, 22f), currentMap, 4, IsBossCleared(currentWorld, 4));
-        string bossText = currentMap == 4
-            ? (mapBossDefeated ? "Boss defeated" : "Boss not defeated")
-            : "Explore unique zone routes";
-        RPGUI.DrawText(new Rect(x + 170f, y - 2f, textW - 170f, RPGUI.HintH), bossText, RPGUI.Hint);
-        y += 28f;
-
-        string tipText = "1–4 travel · Hub gate → Village · Boss gate → next world";
-        if (currentMap == 3) tipText = "1–4 travel · Map 3 has crystal mines (E)";
-        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH), tipText, RPGUI.FieldTag);
+        else
+        {
+            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.LabelH),
+                ProgressionFormulas.MapName(currentWorld, currentMap), RPGUI.Label);
+            y += RPGUI.LabelH - 2f;
+            RPGUI.DrawMapDots(new Rect(x, y, 140f, 20f), currentMap, 4, IsBossCleared(currentWorld, 4));
+            RPGUI.DrawText(new Rect(x + 150f, y - 2f, textW - 150f, RPGUI.FieldTagH),
+                $"W{currentWorld} · Lv{ContentLevel}", RPGUI.FieldTag);
+        }
 
         if (worldPortalReady)
         {

@@ -267,74 +267,40 @@ public class PlayerController : MonoBehaviour
 
         RPGUI.Ensure();
 
-        float panelW = 400f;
-        float panelH = 228f;
+        // Minimal combat HUD — details live in the I character panel.
+        float panelW = 320f;
+        float panelH = 96f;
         Rect panel = new Rect(16f, 16f, panelW, panelH);
         RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
         var prog = PlayerProgression.Instance;
-        string lvText = prog != null ? $"Hero  Lv {prog.level}" : "Hero";
-        RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 10f, 220f, RPGUI.LabelH), lvText, RPGUI.Label);
-
-        RPGUI.DrawText(new Rect(panel.x + 220f, panel.y + 10f, 166f, RPGUI.HintH),
-            $"ATK {_stats.attackDamage:0}  DEF {_stats.defense:0}", RPGUI.Hint);
-        RPGUI.DrawText(new Rect(panel.x + 220f, panel.y + 28f, 166f, RPGUI.FieldTagH),
-            $"SPD {_stats.attackSpeed:0.00}x  RNG {_stats.attackRange:0.0}", RPGUI.FieldTag);
-
-        float barY = panel.y + 58f;
-        float elem = _stats.fireBonus + _stats.iceBonus + _stats.poisonBonus;
-        bool showGems = _stats.critChance > 0.01f || elem > 0.5f || _stats.blockChance > 0.01f
-            || _stats.lifesteal > 0.01f || _stats.damageReduction > 0.01f;
-        if (showGems)
-        {
-            string extras = "";
-            if (_stats.critChance > 0.01f) extras += $"Crit {_stats.critChance * 100f:0}%  ";
-            if (_stats.blockChance > 0.01f) extras += $"Block {_stats.blockChance * 100f:0}%  ";
-            if (_stats.damageReduction > 0.01f) extras += $"DR {_stats.damageReduction * 100f:0}%  ";
-            if (elem > 0.5f) extras += $"Elem +{elem:0}";
-            RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 48f, panelW - 28f, 16f), extras.Trim(), RPGUI.FieldTag);
-            barY = panel.y + 66f;
-        }
+        string lvText = prog != null ? $"Lv {prog.level}" : "Hero";
+        RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 8f, 160f, RPGUI.LabelH), lvText, RPGUI.Label);
+        RPGUI.DrawText(new Rect(panel.x + 160f, panel.y + 12f, panelW - 174f, RPGUI.FieldTagH),
+            "I — Character", RPGUI.FieldTag);
 
         RPGUI.DrawBar(
-            new Rect(panel.x + 14f, barY, panelW - 28f, 26f),
+            new Rect(panel.x + 14f, panel.y + 48f, panelW - 28f, 22f),
             _stats.HealthPercent,
             Color.Lerp(new Color(0.85f, 0.18f, 0.18f), new Color(0.22f, 0.82f, 0.35f), _stats.HealthPercent),
-            $"HP  {Mathf.CeilToInt(_stats.currentHealth)} / {Mathf.CeilToInt(_stats.maxHealth)}"
+            $"{Mathf.CeilToInt(_stats.currentHealth)} / {Mathf.CeilToInt(_stats.maxHealth)}"
         );
 
         if (prog != null)
         {
             RPGUI.DrawBar(
-                new Rect(panel.x + 14f, barY + 32f, panelW - 28f, 22f),
+                new Rect(panel.x + 14f, panel.y + 74f, panelW - 28f, 10f),
                 prog.XpPercent,
                 new Color(0.3f, 0.55f, 1f),
-                $"EXP  {prog.xp} / {prog.xpToNext}"
+                ""
             );
         }
 
-        var inv = PlayerInventory.Instance;
-        if (inv != null)
-        {
-            float eqY = barY + (prog != null ? 60f : 34f);
-            DrawHudEquip(panel.x + 14f, eqY, 180f, "WPN", inv.equippedWeapon);
-            DrawHudEquip(panel.x + 206f, eqY, 180f, "ARM", inv.equippedArmor);
-        }
-
-        var petCtrl = PlayerPetController.Instance;
-        if (petCtrl != null && petCtrl.ActivePet != null)
-        {
-            var pet = petCtrl.ActivePet;
-            RPGUI.DrawText(new Rect(16f, panel.yMax + 28f, 400f, RPGUI.FieldTagH),
-                $"Pet: {pet.displayName} Lv{pet.level}  (~{PetCatalog.ComputeDamage(pet, _stats.attackDamage):0} dmg)",
-                RPGUI.FieldTag);
-        }
-
-        RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 560f, RPGUI.HintH),
+        RPGUI.DrawText(new Rect(16f, panel.yMax + 8f, 420f, RPGUI.FieldTagH),
             AdventureManager.Instance != null && AdventureManager.Instance.IsInVillage
-                ? "WASD move · Space jump · Walk into portals · I bag"
-                : "WASD move · Space jump · Attack · E interact · 1-4 travel · I bag",
-            RPGUI.Hint);
+                ? "WASD · Jump · Portals · I"
+                : "WASD · Jump · Attack · E · 1-4 · I",
+            RPGUI.FieldTag);
 
         var nearAltar = ChallengeAltar.FindNearest(transform.position, ChallengeAltar.InteractRange);
         if (nearAltar != null && !nearAltar.IsRunning)
@@ -367,27 +333,5 @@ public class PlayerController : MonoBehaviour
             RPGUI.DrawPanel(banner, new Color(0.42f, 0.06f, 0.06f, 0.94f));
             RPGUI.DrawText(banner, "You fell! Press R to respawn", RPGUI.Banner);
         }
-    }
-
-    static void DrawHudEquip(float x, float y, float width, string slotTitle, ItemInstance item)
-    {
-        Rect box = new Rect(x, y, width, 64f);
-        RPGUI.DrawPanel(box, RPGUI.PanelBgSoft, false);
-
-        if (item == null)
-        {
-            RPGUI.DrawText(new Rect(x + 10f, y + 16f, width - 20f, RPGUI.HintH), $"{slotTitle} (empty)", RPGUI.Hint);
-            return;
-        }
-
-        RPGUI.Fill(new Rect(x, y, 3f, 64f), item.RarityColor);
-        RPGUI.DrawItemIcon(new Rect(x + 8f, y + 8f, 48f, 48f), item);
-        GUI.color = item.RarityColor;
-        RPGUI.DrawText(new Rect(x + 64f, y + 6f, width - 72f, RPGUI.HintH), item.displayName, RPGUI.Hint);
-        GUI.color = Color.white;
-        string stat = item.slot == ItemSlot.Weapon
-            ? $"ATK {item.attack:0}  SPD +{item.attackSpeedBonus * 100f:0}%  RNG +{item.attackRangeBonus:0.0}"
-            : $"Lv{item.itemLevel}  DEF {item.defense:0}";
-        RPGUI.DrawText(new Rect(x + 64f, y + 34f, width - 72f, RPGUI.FieldTagH), stat, RPGUI.FieldTag);
     }
 }

@@ -182,6 +182,39 @@ public static class RPGUI
         return hit;
     }
 
+    /// <summary>Horizontal tab strip. Returns the selected index.</summary>
+    public static int DrawTabs(Rect rect, string[] labels, int selected)
+    {
+        if (labels == null || labels.Length == 0) return selected;
+        Ensure();
+        float gap = 6f;
+        float tw = (rect.width - gap * (labels.Length - 1)) / labels.Length;
+        for (int i = 0; i < labels.Length; i++)
+        {
+            Rect tr = new Rect(rect.x + i * (tw + gap), rect.y, tw, rect.height);
+            bool on = i == selected;
+            Color fill = on
+                ? new Color(0.28f, 0.42f, 0.72f, 1f)
+                : new Color(0.16f, 0.18f, 0.24f, 1f);
+            if (tr.Contains(Event.current.mousePosition))
+                fill = Color.Lerp(fill, Color.white, 0.12f);
+
+            if (GUI.Button(tr, GUIContent.none, _hitBox))
+                selected = i;
+
+            if (Event.current.type == EventType.Repaint)
+            {
+                Fill(tr, fill);
+                if (on)
+                    Fill(new Rect(tr.x, tr.yMax - 3f, tr.width, 3f), Accent);
+                else
+                    Fill(new Rect(tr.x, tr.y, tr.width, 2f), new Color(1f, 1f, 1f, 0.12f));
+                DrawText(tr, labels[i], _buttonLabelSm);
+            }
+        }
+        return selected;
+    }
+
     public static void DrawToast(string text, Color bg)
     {
         Ensure();
