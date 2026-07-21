@@ -1773,6 +1773,7 @@ MonoBehaviour:
   moveSpeed: 6
   gravity: -20
   rotateSpeed: 12
+  jumpHeight: 1.75
 --- !u!114 &215416594
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1793,10 +1794,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!114 &215416595
@@ -1811,24 +1823,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 32c8868b8f53c483e8d7832c4a333981, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
-  equippedWeapon:
-    id: 
-    displayName: 
-    slot: 0
-    rarity: 0
-    itemLevel: 0
-    attack: 0
-    defense: 0
-    maxHpBonus: 0
-  equippedArmor:
-    id: 
-    displayName: 
-    slot: 0
-    rarity: 0
-    itemLevel: 0
-    attack: 0
-    defense: 0
-    maxHpBonus: 0
   lastLootMessage: 
   showPanel: 0
 --- !u!114 &215416596
@@ -1843,9 +1837,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0fb2ae9bade3f492ba07959f471f3dab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerProgression
-  level: 1
-  xp: 0
-  xpToNext: 40
   lastLevelUpMessage: 
 --- !u!1 &222809203
 GameObject:
@@ -2426,10 +2417,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!1 &310622332
@@ -2849,10 +2851,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!1 &395868487
@@ -2931,10 +2944,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &395868491
@@ -3346,6 +3370,67 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 433112025}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &446385401
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 446385404}
+  - component: {fileID: 446385403}
+  - component: {fileID: 446385402}
+  m_Layer: 0
+  m_Name: NetHud
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &446385402
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 446385401}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1b2c3d4e5f6478890a1b2c3d4e5f601, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetBootstrap
+  playerPrefab: {fileID: 9100000000000000001, guid: b7e4f1a92c8d4e6f9a0b1c2d3e4f5a6b, type: 3}
+  connectAddress: 127.0.0.1
+  connectPort: 7777
+--- !u!114 &446385403
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 446385401}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1b2c3d4e5f6478890a1b2c3d4e5f602, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetHud
+  showPanel: 1
+--- !u!4 &446385404
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 446385401}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &454261502
 GameObject:
   m_ObjectHideFlags: 0
@@ -4500,10 +4585,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &582160966
@@ -6591,10 +6687,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &899728324
@@ -6725,10 +6832,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!1 &937093275
@@ -8295,7 +8413,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   enemyRespawnDelay: 5
-  adventureMode: 1
 --- !u!4 &1053277118
 Transform:
   m_ObjectHideFlags: 0
@@ -8323,6 +8440,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b8b7bfe7f85b457e851a2047f733806, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapRuntimeBuilder
+  catalog: {fileID: 0}
 --- !u!114 &1053277120
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8419,10 +8537,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &1059707720
@@ -9243,10 +9372,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &1175630573
@@ -10965,10 +11105,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &1494517409
@@ -11074,10 +11225,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &1502275391
@@ -12101,10 +12263,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &1678609940
@@ -14563,10 +14736,21 @@ MonoBehaviour:
   defense: 0
   attackRange: 2.2
   attackCooldown: 0.8
+  attackSpeed: 1
   isPlayer: 0
   isDead: 0
+  critChance: 0
+  critDamageBonus: 0.5
+  blockChance: 0
+  damageReduction: 0
+  reflectPercent: 0
+  fireBonus: 0
+  iceBonus: 0
+  poisonBonus: 0
+  lifesteal: 0
   contentLevel: 1
   isBoss: 0
+  isChallengeEnemy: 0
   enemyKind: 0
   mapIndex: 1
 --- !u!143 &2061549919
@@ -14594,6 +14778,112 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 1.25, z: 0}
+--- !u!1 &2078879705
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2078879708}
+  - component: {fileID: 2078879707}
+  - component: {fileID: 2078879706}
+  m_Layer: 0
+  m_Name: NetworkManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2078879706
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2078879705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6960e84d07fb87f47956e7a81d71c4e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Transports.UTP.UnityTransport
+  m_ProtocolType: 0
+  m_UseWebSockets: 0
+  m_UseEncryption: 0
+  m_MaxPacketQueueSize: 128
+  m_MaxPayloadSize: 6144
+  m_HeartbeatTimeoutMS: 500
+  m_ConnectTimeoutMS: 1000
+  m_MaxConnectAttempts: 60
+  m_DisconnectTimeoutMS: 30000
+  ConnectionData:
+    Address: 127.0.0.1
+    Port: 7777
+    WebSocketPath: 
+    ServerListenAddress: 127.0.0.1
+    ClientBindPort: 0
+  DebugSimulator:
+    PacketDelayMS: 0
+    PacketJitterMS: 0
+    PacketDropRate: 0
+--- !u!114 &2078879707
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2078879705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 593a2fe42fa9d37498c96f9a383b6521, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkManager
+  NetworkManagerExpanded: 0
+  NetworkConfig:
+    ProtocolVersion: 0
+    NetworkTransport: {fileID: 2078879706}
+    PlayerPrefab: {fileID: 9100000000000000001, guid: b7e4f1a92c8d4e6f9a0b1c2d3e4f5a6b, type: 3}
+    Prefabs:
+      NetworkPrefabsLists:
+      - {fileID: 11400000, guid: 75513d40fdeaf4c7ea6a1c083a952d31, type: 2}
+    TickRate: 30
+    ClientConnectionBufferTimeout: 10
+    ConnectionApproval: 0
+    ConnectionData: 
+    EnableTimeResync: 0
+    TimeResyncInterval: 30
+    EnsureNetworkVariableLengthSafety: 0
+    EnableSceneManagement: 1
+    ForceSamePrefabs: 1
+    RecycleNetworkIds: 1
+    NetworkIdRecycleDelay: 120
+    RpcHashSize: 0
+    LoadSceneTimeOut: 120
+    SpawnTimeout: 10
+    EnableNetworkLogs: 1
+    NetworkTopology: 0
+    UseCMBService: 0
+    AutoSpawnPlayerPrefabClientSide: 1
+    NetworkProfilingMetrics: 1
+    OldPrefabList: []
+  RunInBackground: 1
+  LogLevel: 1
+--- !u!4 &2078879708
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2078879705}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2116848841
 GameObject:
   m_ObjectHideFlags: 0
@@ -14921,3 +15211,5 @@ SceneRoots:
   - {fileID: 264802747}
   - {fileID: 1053277118}
   - {fileID: 938602537}
+  - {fileID: 446385404}
+  - {fileID: 2078879708}
