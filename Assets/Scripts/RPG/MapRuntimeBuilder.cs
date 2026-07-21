@@ -246,6 +246,7 @@ public class MapRuntimeBuilder : MonoBehaviour
             new Vector3(0.35f, 2.4f, 0.35f), MakeTempMat(ThemeBossAccent(world)), zoneRoot);
 
         AddZoneDecor(zoneRoot, world, map, center, zoneSize);
+        SpawnOreNodes(zoneRoot, world, map, center, zoneSize);
 
         var zone = new GameObject("TileZone_Map" + map);
         zone.transform.SetParent(zoneRoot, false);
@@ -678,6 +679,69 @@ public class MapRuntimeBuilder : MonoBehaviour
             return;
         Prim(PrimitiveType.Cube, "HouseBase", pos + new Vector3(0f, 1.0f, 0f), new Vector3(3.2f, 2.0f, 2.8f), wood, parent);
         Prim(PrimitiveType.Cube, "HouseRoof", pos + new Vector3(0f, 2.3f, 0f), new Vector3(3.6f, 0.5f, 3.2f), roof, parent);
+    }
+
+    void SpawnOreNodes(Transform parent, int world, int map, Vector3 center, float zoneSize)
+    {
+        // Mining focus: map 3 = crystal mine cluster; map 2 = a few veins; map 1 light; map 4 none.
+        int count;
+        switch (map)
+        {
+            case 3: count = 7; break;
+            case 2: count = 3; break;
+            case 1: count = 1; break;
+            default: return;
+        }
+
+        int level = ProgressionFormulas.ContentLevel(world, map);
+        Color[] tints =
+        {
+            new Color(0.95f, 0.25f, 0.3f),
+            new Color(0.3f, 0.5f, 1f),
+            new Color(0.25f, 0.85f, 0.4f),
+            new Color(1f, 0.85f, 0.25f),
+            new Color(0.75f, 0.4f, 1f),
+            new Color(0.4f, 0.9f, 0.95f),
+            new Color(1f, 0.5f, 0.2f)
+        };
+
+        // Dedicated mine pocket on map 3
+        if (map == 3)
+        {
+            Vector3 mineCenter = center + new Vector3(0f, 0f, 4.5f);
+            var stone = MakeTempMat(new Color(0.28f, 0.26f, 0.3f));
+            Prim(PrimitiveType.Cube, "MineWallL", mineCenter + new Vector3(-5f, 1.2f, 0f), new Vector3(1.2f, 2.4f, 6f), stone, parent);
+            Prim(PrimitiveType.Cube, "MineWallR", mineCenter + new Vector3(5f, 1.2f, 0f), new Vector3(1.2f, 2.4f, 6f), stone, parent);
+            Prim(PrimitiveType.Cube, "MineBack", mineCenter + new Vector3(0f, 1.2f, 3.2f), new Vector3(10f, 2.4f, 1.2f), stone, parent);
+            var marker = MakeTempMat(new Color(0.55f, 0.85f, 1f));
+            Prim(PrimitiveType.Cube, "MineSign", mineCenter + new Vector3(0f, 2.6f, -2.5f), new Vector3(2.4f, 0.35f, 0.35f), marker, parent);
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            float ang = (i / (float)count) * Mathf.PI * 2f + world * 0.3f;
+            float rad = map == 3 ? 3.2f + (i % 3) * 0.8f : zoneSize * 0.28f + (i % 2) * 1.2f;
+            Vector3 pos = center + new Vector3(Mathf.Cos(ang) * rad, 0f, Mathf.Sin(ang) * rad + (map == 3 ? 4f : 0f));
+            CreateOreNode(parent, $"Ore_M{map}_{i}", pos, level, tints[i % tints.Length]);
+        }
+    }
+
+    void CreateOreNode(Transform parent, string name, Vector3 pos, int level, Color tint)
+    {
+        var root = new GameObject(name);
+        root.transform.SetParent(parent, false);
+        root.transform.position = pos;
+
+        var mat = MakeTempMat(tint);
+        // Crystal cluster: tall shard + side crystals
+        Prim(PrimitiveType.Cube, "Shard", pos + new Vector3(0f, 0.9f, 0f), new Vector3(0.55f, 1.8f, 0.55f), mat, root.transform);
+        Prim(PrimitiveType.Cube, "ShardL", pos + new Vector3(-0.45f, 0.55f, 0.2f), new Vector3(0.35f, 1.1f, 0.35f), mat, root.transform);
+        Prim(PrimitiveType.Cube, "ShardR", pos + new Vector3(0.4f, 0.45f, -0.15f), new Vector3(0.3f, 0.9f, 0.3f), mat, root.transform);
+        Prim(PrimitiveType.Cube, "Base", pos + new Vector3(0f, 0.15f, 0f), new Vector3(1.1f, 0.3f, 1.1f), MakeTempMat(new Color(0.25f, 0.24f, 0.28f)), root.transform);
+
+        // Prim parents under root but uses world pos — check Prim implementation
+        var ore = root.AddComponent<OreNode>();
+        ore.Configure(level, "Crystal Vein", tint);
     }
 
     void SpawnEnemiesInZone(Transform parent, int world, int map, Vector3 center)

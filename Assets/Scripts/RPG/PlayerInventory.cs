@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 
 public class PlayerInventory : MonoBehaviour
 {
-    public const int MaxBag = 24;
+    public const int MaxBag = 32;
 
     // Must not be Unity-serialized: exiting Play Mode restores scene defaults
     // (empty items) and was overwriting save files on quit.
@@ -120,7 +120,19 @@ public class PlayerInventory : MonoBehaviour
     {
         if (index < 0 || index >= bag.Count) return;
         var item = bag[index];
+        if (item == null) return;
+
+        if (item.slot == ItemSlot.Gem)
+        {
+            // Prefer weapon sockets, then armor.
+            if (TrySocketGem(index, preferWeapon: true) || TrySocketGem(index, preferWeapon: false))
+                return;
+            ShowLoot("No empty sockets (need Uncommon+ gear)");
+            return;
+        }
+
         bag.RemoveAt(index);
+        GemCatalog.EnsureSockets(item);
 
         if (item.slot == ItemSlot.Weapon)
         {
@@ -137,6 +149,101 @@ public class PlayerInventory : MonoBehaviour
         ShowLoot($"Equipped {item.displayName}");
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
+    }
+
+    public bool TrySocketGem(int bagIndex, bool preferWeapon)
+    {
+        if (bagIndex < 0 || bagIndex >= bag.Count) return false;
+        var gem = bag[bagIndex];
+        if (gem == null || gem.slot != ItemSlot.Gem) return false;
+
+        ItemInstance gear = preferWeapon ? equippedWeapon : equippedArmor;
+        if (gear == null) return false;
+        GemCatalog.EnsureSockets(gear);
+
+        int slot = -1;
+        for (int i = 0; i < gear.socketCount; i++)
+        {
+            if (gear.sockets[i] == null)
+            {
+                slot = i;
+                break;
+            }
+        }
+        if (slot < 0) return false;
+
+        bag.RemoveAt(bagIndex);
+        gear.sockets[slot] = gem;
+        ApplyEquipmentStats(false);
+        ShowLoot($"Socketed {gem.displayName} into {(preferWeapon ? "Weapon" : "Armor")}");
+        if (AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
+        return true;
+    }
+
+    public void Unsocket(bool fromWeapon, int socketIndex)
+    {
+        var gear = fromWeapon ? equippedWeapon : equippedArmor;
+        if (gear?.sockets == null) return;
+        if (socketIndex < 0 || socketIndex >= gear.sockets.Length) return;
+        var gem = gear.sockets[socketIndex];
+        if (gem == null) return;
+        if (bag.Count >= MaxBag)
+        {
+            ShowLoot("Bag full — cannot unsocket");
+            return;
+        }
+        gear.sockets[socketIndex] = null;
+        bag.Add(gem);
+        ApplyEquipmentStats(false);
+        ShowLoot($"Removed {gem.displayName}");
+        if (AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
+    }
+
+    public void ApplyEquipmentStats(bool refillHp)
+    {
+        if (_stats == null) _stats = GetComponent<CharacterStats>();
+
+        int lv = PlayerProgression.Instance != null ? PlayerProgression.Instance.level : 1;
+
+        float baseHp = 100f + ProgressionFormulas.PlayerLevelBonusHp(lv);
+        float baseAtk = 12f + ProgressionFormulas.PlayerLevelBonusAtk(lv);
+        float baseDef = ProgressionFormulas.PlayerLevelBonusDef(lv);
+
+        if (equippedWeapon != null) GemCatalog.EnsureSockets(equippedWeapon);
+        if (equippedArmor != null) GemCatalog.EnsureSockets(equippedArmor);
+
+        float weaponAtk = equippedWeapon != null ? equippedWeapon.attack : 0f;
+        float armorDef = equippedArmor != null ? equippedArmor.defense : 0f;
+        float armorHp = equippedArmor != null ? equippedArmor.maxHpBonus : 0f;
+
+        var gems = GemCatalog.SumSockets(equippedWeapon, equippedArmor);
+
+        float atk = (baseAtk + weaponAtk + gems.attackFlat) * (1f + gems.attackPercent);
+        float def = (baseDef + armorDef + gems.defenseFlat) * (1f + gems.defensePercent);
+        float hp = baseHp + armorHp + gems.maxHpFlat;
+
+        _stats.baseAttack = atk;
+        _stats.attackDamage = atk;
+        _stats.defense = def;
+        _stats.maxHealth = hp;
+
+        _stats.critChance = gems.critChance;
+        _stats.critDamageBonus = 0.5f + gems.critDamage;
+        _stats.blockChance = gems.blockChance;
+        _stats.damageReduction = gems.damageReduction;
+        _stats.reflectPercent = gems.reflectPercent;
+        _stats.fireBonus = gems.fireDamage;
+        _stats.iceBonus = gems.iceDamage;
+        _stats.poisonBonus = gems.poisonDamage;
+        _stats.lifesteal = gems.lifesteal;
+        _stats.cooldownReduction = gems.cooldownReduction;
+
+        if (refillHp || _stats.currentHealth > _stats.maxHealth)
+            _stats.currentHealth = _stats.maxHealth;
+        else
+            _stats.currentHealth = Mathf.Min(_stats.currentHealth, _stats.maxHealth);
     }
 
     /// <summary>
@@ -280,6 +387,11 @@ public class PlayerInventory : MonoBehaviour
                 crafted++;
                 progressed = true;
             }
+            if (TryAutoSynthesizeGems(out _))
+            {
+                crafted++;
+                progressed = true;
+            }
         }
 
         if (crafted > 0)
@@ -327,29 +439,30 @@ public class PlayerInventory : MonoBehaviour
         return true;
     }
 
-    public void ApplyEquipmentStats(bool refillHp)
+    bool TryAutoSynthesizeGems(out ItemInstance result)
     {
-        if (_stats == null) _stats = GetComponent<CharacterStats>();
-
-        int lv = PlayerProgression.Instance != null ? PlayerProgression.Instance.level : 1;
-
-        float baseHp = 100f + ProgressionFormulas.PlayerLevelBonusHp(lv);
-        float baseAtk = 12f + ProgressionFormulas.PlayerLevelBonusAtk(lv);
-        float baseDef = ProgressionFormulas.PlayerLevelBonusDef(lv);
-
-        float weaponAtk = equippedWeapon != null ? equippedWeapon.attack : 0f;
-        float armorDef = equippedArmor != null ? equippedArmor.defense : 0f;
-        float armorHp = equippedArmor != null ? equippedArmor.maxHpBonus : 0f;
-
-        _stats.baseAttack = baseAtk + weaponAtk;
-        _stats.defense = baseDef + armorDef;
-        _stats.maxHealth = baseHp + armorHp;
-        _stats.attackDamage = _stats.baseAttack;
-
-        if (refillHp || _stats.currentHealth > _stats.maxHealth)
-            _stats.currentHealth = _stats.maxHealth;
-        else
-            _stats.currentHealth = Mathf.Min(_stats.currentHealth, _stats.maxHealth);
+        result = null;
+        // Group bag gems by kind; craft 3 of same kind (lowest levels first).
+        for (int k = 0; k <= 11; k++)
+        {
+            var idxs = new List<int>();
+            for (int i = 0; i < bag.Count; i++)
+            {
+                if (bag[i] != null && bag[i].slot == ItemSlot.Gem && (int)bag[i].gemKind == k)
+                    idxs.Add(i);
+            }
+            if (idxs.Count < 3) continue;
+            idxs.Sort((a, b) => bag[a].itemLevel.CompareTo(bag[b].itemLevel));
+            result = ProgressionFormulas.Synthesize(bag[idxs[0]], bag[idxs[1]], bag[idxs[2]]);
+            if (result == null) continue;
+            var remove = new List<int> { idxs[0], idxs[1], idxs[2] };
+            remove.Sort();
+            for (int i = remove.Count - 1; i >= 0; i--)
+                bag.RemoveAt(remove[i]);
+            bag.Add(result);
+            return true;
+        }
+        return false;
     }
 
     public bool showPanel;
@@ -419,16 +532,16 @@ public class PlayerInventory : MonoBehaviour
         y += RPGUI.LabelH;
 
         float cardW = (w - pad * 2f - 12f) * 0.5f;
-        float cardH = 128f;
-        DrawEquippedCard(panel.x + pad, y, cardW, cardH, "Weapon", equippedWeapon);
-        DrawEquippedCard(panel.x + pad + cardW + 12f, y, cardW, cardH, "Armor", equippedArmor);
+        float cardH = 168f;
+        DrawEquippedCard(panel.x + pad, y, cardW, cardH, "Weapon", equippedWeapon, true);
+        DrawEquippedCard(panel.x + pad + cardW + 12f, y, cardW, cardH, "Armor", equippedArmor, false);
         y += cardH + 12f;
 
         int craftable = CountCraftableBatches();
         int upgradeCount = CountUpgradesInBag();
         string bagHint = upgradeCount > 0
-            ? $"Bag {bag.Count}/{MaxBag}  |  {upgradeCount} upgrade(s) available"
-            : $"Bag {bag.Count}/{MaxBag}  |  No better gear";
+            ? $"Bag {bag.Count}/{MaxBag}  |  {upgradeCount} upgrade(s)  |  Click gem to socket"
+            : $"Bag {bag.Count}/{MaxBag}  |  Click gem to socket into gear";
         RPGUI.DrawText(new Rect(panel.x + pad, y, w - pad * 2f, RPGUI.HintH), bagHint, RPGUI.Hint);
         y += RPGUI.HintH + 6f;
 
@@ -446,7 +559,8 @@ public class PlayerInventory : MonoBehaviour
             DrawItemLine(0f, i * rowH, contentW - 4f, bag[i], i);
 
         if (bag.Count == 0)
-            RPGUI.DrawText(new Rect(8f, 16f, contentW - 16f, RPGUI.HintH), "Bag is empty — defeat monsters for loot", RPGUI.Hint);
+            RPGUI.DrawText(new Rect(8f, 16f, contentW - 16f, RPGUI.HintH),
+                "Bag empty — defeat monsters or mine ores (E)", RPGUI.Hint);
 
         GUI.EndScrollView();
 
@@ -469,7 +583,7 @@ public class PlayerInventory : MonoBehaviour
         for (int i = 0; i < bag.Count; i++)
         {
             var item = bag[i];
-            if (item == null) continue;
+            if (item == null || item.slot == ItemSlot.Gem) continue;
             var eq = item.slot == ItemSlot.Weapon ? equippedWeapon : equippedArmor;
             if (IsBetterGear(item, eq)) n++;
         }
@@ -480,15 +594,25 @@ public class PlayerInventory : MonoBehaviour
     {
         int weapons = 0;
         int armors = 0;
+        int gems = 0;
+        var gemCounts = new int[12];
         for (int i = 0; i < bag.Count; i++)
         {
             if (bag[i] == null) continue;
             if (bag[i].slot == ItemSlot.Weapon) weapons++;
-            else armors++;
+            else if (bag[i].slot == ItemSlot.Armor) armors++;
+            else if (bag[i].slot == ItemSlot.Gem)
+            {
+                gems++;
+                int k = Mathf.Clamp((int)bag[i].gemKind, 0, 11);
+                gemCounts[k]++;
+            }
         }
 
-        // Approximate recursive craft count: every 3 items → 1, leftover stays.
-        return CountRecursiveCrafts(weapons) + CountRecursiveCrafts(armors);
+        int total = CountRecursiveCrafts(weapons) + CountRecursiveCrafts(armors);
+        for (int k = 0; k < gemCounts.Length; k++)
+            total += CountRecursiveCrafts(gemCounts[k]);
+        return total;
     }
 
     static int CountRecursiveCrafts(int count)
@@ -505,14 +629,14 @@ public class PlayerInventory : MonoBehaviour
 
     static float MathMin(float a, float b) => a < b ? a : b;
 
-    void DrawEquippedCard(float x, float y, float width, float height, string slotTitle, ItemInstance item)
+    void DrawEquippedCard(float x, float y, float width, float height, string slotTitle, ItemInstance item, bool isWeapon)
     {
         Rect r = new Rect(x, y, width, height);
         RPGUI.DrawPanel(r, new Color(0.12f, 0.14f, 0.2f, 0.98f), false);
         if (item != null)
             RPGUI.Fill(new Rect(x, y, 4f, height), item.RarityColor);
 
-        RPGUI.DrawText(new Rect(x + 14f, y + 8f, width - 28f, RPGUI.FieldTagH), slotTitle, RPGUI.FieldTag);
+        RPGUI.DrawText(new Rect(x + 14f, y + 6f, width - 28f, RPGUI.FieldTagH), slotTitle, RPGUI.FieldTag);
 
         if (item == null)
         {
@@ -520,11 +644,11 @@ public class PlayerInventory : MonoBehaviour
             return;
         }
 
-        float bodyY = y + 36f;
-        RPGUI.DrawItemIcon(new Rect(x + 14f, bodyY, 68f, 68f), item);
+        float bodyY = y + 32f;
+        RPGUI.DrawItemIcon(new Rect(x + 12f, bodyY, 56f, 56f), item);
 
-        float textX = x + 96f;
-        float textW = width - 110f;
+        float textX = x + 78f;
+        float textW = width - 90f;
 
         GUI.color = item.RarityColor;
         RPGUI.DrawText(new Rect(textX, bodyY, textW, RPGUI.ItemNameH), item.displayName, RPGUI.ItemName);
@@ -536,7 +660,41 @@ public class PlayerInventory : MonoBehaviour
         string stats = item.slot == ItemSlot.Weapon
             ? $"Lv {item.itemLevel} · {styleTag} · ATK {item.attack:0}"
             : $"Lv {item.itemLevel} · {styleTag} · DEF {item.defense:0} · HP +{item.maxHpBonus:0}";
-        RPGUI.DrawText(new Rect(textX, bodyY + 42f, textW, RPGUI.ItemMetaH), stats, RPGUI.ItemMeta);
+        RPGUI.DrawText(new Rect(textX, bodyY + 36f, textW, RPGUI.ItemMetaH), stats, RPGUI.ItemMeta);
+
+        GemCatalog.EnsureSockets(item);
+        float sockY = y + height - 42f;
+        RPGUI.DrawText(new Rect(x + 12f, sockY - 22f, 160f, RPGUI.FieldTagH),
+            $"Sockets {CountFilledSockets(item)}/{item.socketCount}", RPGUI.FieldTag);
+        for (int i = 0; i < GemCatalog.MaxSockets; i++)
+        {
+            float sx = x + 12f + i * 44f;
+            Rect sr = new Rect(sx, sockY, 38f, 32f);
+            bool usable = i < item.socketCount;
+            if (!usable)
+            {
+                RPGUI.Fill(sr, new Color(0.08f, 0.08f, 0.1f, 0.5f));
+                continue;
+            }
+            var gem = item.sockets[i];
+            if (gem != null)
+            {
+                RPGUI.Fill(sr, GemCatalog.KindColor(gem.gemKind));
+                if (RPGUI.ButtonSm(sr, "x"))
+                    Unsocket(isWeapon, i);
+            }
+            else
+                RPGUI.Fill(sr, new Color(0.18f, 0.2f, 0.26f, 1f));
+        }
+    }
+
+    static int CountFilledSockets(ItemInstance gear)
+    {
+        if (gear?.sockets == null) return 0;
+        int n = 0;
+        for (int i = 0; i < gear.socketCount && i < gear.sockets.Length; i++)
+            if (gear.sockets[i] != null) n++;
+        return n;
     }
 
     void DrawItemLine(float x, float y, float width, ItemInstance item, int bagIndex)
@@ -549,25 +707,33 @@ public class PlayerInventory : MonoBehaviour
             return;
         }
 
+        bool isGem = item.slot == ItemSlot.Gem;
         var equipped = item.slot == ItemSlot.Weapon ? equippedWeapon : equippedArmor;
-        bool better = IsBetterGear(item, equipped);
-        bool worse = equipped != null && !better && GearScore(item) < GearScore(equipped) - 0.5f;
+        bool better = !isGem && IsBetterGear(item, equipped);
+        bool worse = !isGem && equipped != null && !better && GearScore(item) < GearScore(equipped) - 0.5f;
 
         Rect r = new Rect(x, y, width, rowH);
-        Color bg = better
-            ? new Color(0.1f, 0.18f, 0.14f, 0.96f)
-            : new Color(0.11f, 0.12f, 0.16f, 0.94f);
+        Color bg = isGem
+            ? new Color(0.12f, 0.1f, 0.16f, 0.96f)
+            : (better ? new Color(0.1f, 0.18f, 0.14f, 0.96f) : new Color(0.11f, 0.12f, 0.16f, 0.94f));
         RPGUI.DrawPanel(r, bg, false);
         RPGUI.Fill(new Rect(x, y, 4f, rowH), item.RarityColor);
 
         RPGUI.DrawItemIcon(new Rect(x + 14f, y + 12f, 66f, 66f), item);
 
-        string styleTag = item.slot == ItemSlot.Weapon
-            ? WeaponVisualUtil.StyleLabel(WeaponVisualUtil.StyleIndex(item.itemLevel))
-            : ArmorVisualUtil.StyleLabel(ArmorVisualUtil.StyleIndex(item.itemLevel));
-        string stats = item.slot == ItemSlot.Weapon
-            ? $"ATK {item.attack:0}"
-            : $"DEF {item.defense:0} · HP +{item.maxHpBonus:0}";
+        string meta;
+        if (isGem)
+            meta = $"Lv {item.itemLevel} · {GemCatalog.EffectLabel(item.gemKind)} · {GemCatalog.StatsLine(item)}";
+        else
+        {
+            string styleTag = item.slot == ItemSlot.Weapon
+                ? WeaponVisualUtil.StyleLabel(WeaponVisualUtil.StyleIndex(item.itemLevel))
+                : ArmorVisualUtil.StyleLabel(ArmorVisualUtil.StyleIndex(item.itemLevel));
+            string stats = item.slot == ItemSlot.Weapon
+                ? $"ATK {item.attack:0}"
+                : $"DEF {item.defense:0} · HP +{item.maxHpBonus:0}";
+            meta = $"Lv {item.itemLevel} · {styleTag} · {stats}";
+        }
 
         float textX = x + 94f;
         float textW = width - 230f;
@@ -576,15 +742,24 @@ public class PlayerInventory : MonoBehaviour
         RPGUI.DrawText(new Rect(textX, y + 10f, textW, RPGUI.ItemNameH), item.displayName, RPGUI.ItemName);
         GUI.color = Color.white;
 
-        RPGUI.DrawText(new Rect(textX, y + 50f, textW, RPGUI.ItemMetaH),
-            $"Lv {item.itemLevel} · {styleTag} · {stats}", RPGUI.ItemMeta);
+        RPGUI.DrawText(new Rect(textX, y + 50f, textW, RPGUI.ItemMetaH), meta, RPGUI.ItemMeta);
 
-        string cmp = CompareLabel(item);
-        Color chipBg = better ? RPGUI.Good : (worse ? new Color(0.35f, 0.28f, 0.28f, 1f) : new Color(0.28f, 0.32f, 0.4f, 1f));
-        RPGUI.DrawChip(new Rect(x + width - 210f, y + 12f, 88f, 28f), cmp, chipBg);
+        if (isGem)
+        {
+            RPGUI.DrawChip(new Rect(x + width - 210f, y + 12f, 88f, 28f), "Gem", GemCatalog.KindColor(item.gemKind));
+            if (bagIndex >= 0 &&
+                RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), "Socket", true))
+                EquipFromBag(bagIndex);
+        }
+        else
+        {
+            string cmp = CompareLabel(item);
+            Color chipBg = better ? RPGUI.Good : (worse ? new Color(0.35f, 0.28f, 0.28f, 1f) : new Color(0.28f, 0.32f, 0.4f, 1f));
+            RPGUI.DrawChip(new Rect(x + width - 210f, y + 12f, 88f, 28f), cmp, chipBg);
 
-        if (bagIndex >= 0 &&
-            RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), "Equip", better))
-            EquipFromBag(bagIndex);
+            if (bagIndex >= 0 &&
+                RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), "Equip", better))
+                EquipFromBag(bagIndex);
+        }
     }
 }

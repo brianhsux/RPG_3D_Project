@@ -13,10 +13,18 @@ public class ItemInstance
     public float defense;
     public float maxHpBonus;
 
+    // Gems
+    public GemKind gemKind;
+    // Gear sockets (size GemCatalog.MaxSockets; first socketCount are usable)
+    public int socketCount;
+    public ItemInstance[] sockets;
+
     public string Summary
     {
         get
         {
+            if (slot == ItemSlot.Gem)
+                return $"{RarityColorTag}{displayName}</color>  Lv{itemLevel}  {GemCatalog.EffectLabel(gemKind)}";
             if (slot == ItemSlot.Weapon)
                 return $"{RarityColorTag}{displayName}</color>  Lv{itemLevel}  ATK {attack:0}";
             return $"{RarityColorTag}{displayName}</color>  Lv{itemLevel}  DEF {defense:0}  HP+{maxHpBonus:0}";
@@ -42,6 +50,7 @@ public class ItemInstance
     {
         get
         {
+            if (slot == ItemSlot.Gem) return GemCatalog.KindColor(gemKind);
             switch (rarity)
             {
                 case ItemRarity.Uncommon: return new Color(0.36f, 0.79f, 0.42f);
@@ -97,7 +106,7 @@ public static class ItemFactory
             item.defense = 0f;
             item.maxHpBonus = 0f;
         }
-        else
+        else if (slot == ItemSlot.Armor)
         {
             item.displayName = $"{RarityName(rarity)}·{ArmorNames[nameIndex]}";
             item.attack = 0f;
@@ -105,6 +114,7 @@ public static class ItemFactory
             item.maxHpBonus = ProgressionFormulas.ArmorMaxHp(itemLevel, rarity);
         }
 
+        GemCatalog.EnsureSockets(item);
         return item;
     }
 

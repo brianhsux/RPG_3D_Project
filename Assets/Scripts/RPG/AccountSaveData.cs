@@ -11,22 +11,53 @@ public class ItemSaveData
     public float attack;
     public float defense;
     public float maxHpBonus;
+    public int gemKind;
+    public ItemSaveData[] sockets;
 
-    public bool IsValid =>
-        !string.IsNullOrEmpty(displayName) &&
-        displayName != "Unknown Item" &&
-        displayName != "未知裝備" &&
-        itemLevel >= 1 &&
-        (attack > 0.01f || defense > 0.01f || maxHpBonus > 0.01f);
+    public bool IsValid
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(displayName)) return false;
+            if (displayName == "Unknown Item" || displayName == "未知裝備") return false;
+            if (itemLevel < 1) return false;
+            if (slot == (int)ItemSlot.Gem) return true;
+            return attack > 0.01f || defense > 0.01f || maxHpBonus > 0.01f;
+        }
+    }
 
     public static ItemSaveData From(ItemInstance item)
     {
         if (item == null) return null;
         if (string.IsNullOrEmpty(item.displayName)) return null;
         if (item.itemLevel < 1) return null;
-        // Reject empty serialized placeholders (scene defaults).
+
+        if (item.slot == ItemSlot.Gem)
+        {
+            return new ItemSaveData
+            {
+                displayName = item.displayName,
+                slot = (int)ItemSlot.Gem,
+                rarity = (int)item.rarity,
+                itemLevel = item.itemLevel,
+                gemKind = (int)item.gemKind,
+                attack = 0f,
+                defense = 0f,
+                maxHpBonus = 0f
+            };
+        }
+
         if (item.attack <= 0.01f && item.defense <= 0.01f && item.maxHpBonus <= 0.01f)
             return null;
+
+        GemCatalog.EnsureSockets(item);
+        ItemSaveData[] sockSave = null;
+        if (item.sockets != null && item.socketCount > 0)
+        {
+            sockSave = new ItemSaveData[GemCatalog.MaxSockets];
+            for (int i = 0; i < item.socketCount && i < item.sockets.Length; i++)
+                sockSave[i] = From(item.sockets[i]);
+        }
 
         return new ItemSaveData
         {
@@ -36,14 +67,24 @@ public class ItemSaveData
             itemLevel = item.itemLevel,
             attack = item.attack,
             defense = item.defense,
-            maxHpBonus = item.maxHpBonus
+            maxHpBonus = item.maxHpBonus,
+            sockets = sockSave
         };
     }
 
     public ItemInstance ToItem()
     {
         if (!IsValid) return null;
-        return new ItemInstance
+
+        if (slot == (int)ItemSlot.Gem)
+        {
+            return GemCatalog.CreateGem(
+                (GemKind)Mathf.Clamp(gemKind, 0, 11),
+                Mathf.Clamp(itemLevel, 1, 40),
+                (ItemRarity)Mathf.Clamp(rarity, 0, 4));
+        }
+
+        var item = new ItemInstance
         {
             id = Guid.NewGuid().ToString("N"),
             displayName = displayName,
@@ -54,6 +95,16 @@ public class ItemSaveData
             defense = defense,
             maxHpBonus = maxHpBonus
         };
+        GemCatalog.EnsureSockets(item);
+        if (sockets != null)
+        {
+            for (int i = 0; i < item.socketCount && i < sockets.Length && i < item.sockets.Length; i++)
+            {
+                if (sockets[i] != null)
+                    item.sockets[i] = sockets[i].ToItem();
+            }
+        }
+        return item;
     }
 }
 

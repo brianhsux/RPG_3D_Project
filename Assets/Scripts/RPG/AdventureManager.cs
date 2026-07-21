@@ -264,7 +264,8 @@ public class AdventureManager : MonoBehaviour
         RPGUI.DrawText(new Rect(x + 170f, y - 2f, textW - 170f, RPGUI.HintH), bossText, RPGUI.Hint);
         y += 28f;
 
-        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH), "1–4 Teleport zones", RPGUI.FieldTag);
+        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH),
+            currentMap == 3 ? "1–4 travel · Map 3 has crystal mines (E)" : "1–4 Teleport zones", RPGUI.FieldTag);
 
         if (worldPortalReady)
         {

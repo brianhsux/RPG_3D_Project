@@ -13,6 +13,18 @@ public class CharacterStats : MonoBehaviour
     public bool isPlayer;
     public bool isDead;
 
+    // Gem-driven combat mods (player)
+    public float critChance;
+    public float critDamageBonus = 0.5f; // added to 1.0 => 1.5x default crit
+    public float blockChance;
+    public float damageReduction;
+    public float reflectPercent;
+    public float fireBonus;
+    public float iceBonus;
+    public float poisonBonus;
+    public float lifesteal;
+    public float cooldownReduction;
+
     public int contentLevel = 1;
     public bool isBoss;
     public EnemyKind enemyKind = EnemyKind.Slime;
@@ -66,7 +78,8 @@ public class CharacterStats : MonoBehaviour
 
     public bool CanAttack()
     {
-        return !isDead && Time.time >= _lastAttackTime + attackCooldown;
+        float cd = attackCooldown * (1f - Mathf.Clamp01(cooldownReduction));
+        return !isDead && Time.time >= _lastAttackTime + cd;
     }
 
     public void MarkAttack()
@@ -74,17 +87,62 @@ public class CharacterStats : MonoBehaviour
         _lastAttackTime = Time.time;
     }
 
-    public void TakeDamage(float amount)
+    /// <summary>Player (or any) attack with gem crit / elemental / lifesteal.</summary>
+    public float DealAttack(CharacterStats target)
     {
-        if (isDead) return;
-        float finalDmg = isPlayer
-            ? ProgressionFormulas.MitigateDamage(amount, defense)
-            : amount;
+        if (target == null || target.isDead || isDead) return 0f;
 
+        float dmg = attackDamage;
+        bool crit = Random.value < Mathf.Clamp01(critChance);
+        if (crit)
+            dmg *= 1f + Mathf.Max(0.35f, critDamageBonus);
+
+        float total = dmg + fireBonus + iceBonus + poisonBonus;
+        float dealt = target.TakeDamage(total, this);
+
+        if (lifesteal > 0f && dealt > 0f)
+            currentHealth = Mathf.Min(maxHealth, currentHealth + dealt * lifesteal);
+
+        return dealt;
+    }
+
+    public float TakeDamage(float amount, CharacterStats source = null)
+    {
+        if (isDead) return 0f;
+
+        float incoming = Mathf.Max(0f, amount);
+
+        if (isPlayer)
+        {
+            if (blockChance > 0f && Random.value < blockChance)
+                incoming *= 0.2f; // Block absorbs most damage
+
+            incoming *= 1f - Mathf.Clamp01(damageReduction);
+            incoming = ProgressionFormulas.MitigateDamage(incoming, defense);
+        }
+
+        float finalDmg = Mathf.Max(0f, incoming);
         currentHealth = Mathf.Max(0f, currentHealth - finalDmg);
 
         DamageNumbers.Spawn(transform.position, finalDmg, isPlayer, isBoss);
 
+        if (isPlayer && reflectPercent > 0f && source != null && !source.isDead && finalDmg > 0.5f)
+        {
+            float reflected = finalDmg * reflectPercent;
+            source.ApplyRawDamage(reflected);
+            DamageNumbers.Spawn(source.transform.position, reflected, false, source.isBoss);
+        }
+
+        if (currentHealth <= 0f)
+            Die();
+
+        return finalDmg;
+    }
+
+    public void ApplyRawDamage(float amount)
+    {
+        if (isDead || amount <= 0f) return;
+        currentHealth = Mathf.Max(0f, currentHealth - amount);
         if (currentHealth <= 0f)
             Die();
     }

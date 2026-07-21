@@ -160,6 +160,11 @@ public static class ProgressionFormulas
             best = (ItemRarity)((int)best + 1);
 
         int newLevel = Mathf.Clamp(avg + bonus, 1, MaxContentLevel);
+        if (a.slot == ItemSlot.Gem)
+        {
+            if (a.gemKind != b.gemKind || b.gemKind != c.gemKind) return null;
+            return GemCatalog.CreateGem(a.gemKind, newLevel, best);
+        }
         return ItemFactory.Create(a.slot, newLevel, best);
     }
 
@@ -264,7 +269,8 @@ public enum EnemyKind
 public enum ItemSlot
 {
     Weapon,
-    Armor
+    Armor,
+    Gem
 }
 
 public enum ItemRarity

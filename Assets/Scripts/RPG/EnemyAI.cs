@@ -186,7 +186,7 @@ public class EnemyAI : MonoBehaviour
                     _bodyAnim.PlayAttack(_stats.isBoss ? 0.45f : 0.35f);
                 var playerStats = _player.GetComponent<CharacterStats>();
                 if (playerStats != null)
-                    playerStats.TakeDamage(_stats.attackDamage);
+                    playerStats.TakeDamage(_stats.attackDamage, _stats);
             }
         }
 

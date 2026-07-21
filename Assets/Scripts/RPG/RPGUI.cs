@@ -217,10 +217,31 @@ public static class RPGUI
             DrawItemIcon(rect, ItemSlot.Weapon, Color.white, 0);
             return;
         }
+        if (item.slot == ItemSlot.Gem)
+        {
+            DrawGemIcon(rect, item);
+            return;
+        }
         int style = item.slot == ItemSlot.Weapon
             ? WeaponVisualUtil.StyleIndex(item.itemLevel)
             : ArmorVisualUtil.StyleIndex(item.itemLevel);
         DrawItemIcon(rect, item.slot, item.RarityColor, style, item.itemLevel, item.rarity);
+    }
+
+    public static void DrawGemIcon(Rect rect, ItemInstance gem)
+    {
+        Ensure();
+        Color c = gem != null ? GemCatalog.KindColor(gem.gemKind) : Color.white;
+        Fill(rect, new Color(0.08f, 0.08f, 0.1f, 0.95f));
+        Fill(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, 4f), c);
+
+        float cx = rect.x + rect.width * 0.5f;
+        float cy = rect.y + rect.height * 0.55f;
+        float s = rect.height * 0.28f;
+        // Diamond facet
+        Fill(new Rect(cx - s * 0.7f, cy - s * 0.2f, s * 1.4f, s * 0.85f), c);
+        Fill(new Rect(cx - s * 0.35f, cy - s * 0.75f, s * 0.7f, s * 0.55f), Color.Lerp(c, Color.white, 0.35f));
+        Fill(new Rect(cx - 3f, cy - s * 0.15f, 6f, 6f), Color.white);
     }
 
     public static void DrawItemIcon(Rect rect, ItemSlot slot, Color rarityColor)
@@ -245,6 +266,11 @@ public static class RPGUI
 
         if (slot == ItemSlot.Weapon)
             DrawWeaponGlyph(cx, top, h, style, rarityColor, itemLevel, rarity);
+        else if (slot == ItemSlot.Gem)
+        {
+            GUI.color = rarityColor;
+            GUI.DrawTexture(new Rect(cx - 12f, top + h * 0.25f, 24f, 24f), _white);
+        }
         else
             DrawArmorGlyph(cx, top, h, style, rarity);
 

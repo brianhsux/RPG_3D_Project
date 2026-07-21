@@ -107,6 +107,8 @@ public class PlayerController : MonoBehaviour
         if (HasEnemyInAttackRange() || WasAttackPressed())
             TryAttack();
 
+        TryMineInput();
+
         if (_attackAnimT > 0f)
             _attackAnimT -= Time.deltaTime;
 
@@ -201,6 +203,17 @@ public class PlayerController : MonoBehaviour
         return new Vector3(0f, 0.5f, 0f);
     }
 
+    void TryMineInput()
+    {
+        var kb = Keyboard.current;
+        if (kb == null || !kb.eKey.wasPressedThisFrame) return;
+        var ore = OreNode.FindNearest(transform.position, 3.5f);
+        if (ore == null) return;
+        var inv = PlayerInventory.Instance;
+        if (inv == null) return;
+        ore.TryMine(inv);
+    }
+
     void TryAttack()
     {
         if (!_stats.CanAttack()) return;
@@ -230,7 +243,7 @@ public class PlayerController : MonoBehaviour
         _stats.MarkAttack();
         _attackAnimT = 0.28f;
         if (_bodyAnim != null) _bodyAnim.PlayAttack(0.35f);
-        best.TakeDamage(_stats.attackDamage);
+        _stats.DealAttack(best);
     }
 
     void OnGUI()
@@ -276,8 +289,16 @@ public class PlayerController : MonoBehaviour
             DrawHudEquip(panel.x + 206f, panel.y + 120f, 180f, "ARM", inv.equippedArmor);
         }
 
-        RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 520f, RPGUI.HintH),
-            "WASD Move · Space Jump · Attack in range · 1-4 Teleport · I Inventory", RPGUI.Hint);
+        RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 560f, RPGUI.HintH),
+            "WASD move · Space jump · Attack · E mine · 1-4 travel · I bag", RPGUI.Hint);
+
+        var nearOre = OreNode.FindNearest(transform.position, 3.5f);
+        if (nearOre != null && !nearOre.IsDepleted)
+        {
+            Rect tip = new Rect(Screen.width * 0.5f - 240f, Screen.height * 0.72f, 480f, 40f);
+            RPGUI.DrawPanel(tip, new Color(0.08f, 0.14f, 0.2f, 0.9f));
+            RPGUI.DrawText(tip, $"Press E to mine — {nearOre.HitsLeft} hits left", RPGUI.Hint);
+        }
 
         if (_stats.isDead)
         {
