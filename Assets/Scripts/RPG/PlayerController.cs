@@ -109,7 +109,7 @@ public class PlayerController : MonoBehaviour
         if (HasEnemyInAttackRange() || WasAttackPressed())
             TryAttack();
 
-        TryMineInput();
+        TryInteractInput();
 
         if (_attackAnimT > 0f)
             _attackAnimT -= Time.deltaTime;
@@ -205,10 +205,18 @@ public class PlayerController : MonoBehaviour
         return new Vector3(0f, 0.5f, 0f);
     }
 
-    void TryMineInput()
+    void TryInteractInput()
     {
         var kb = Keyboard.current;
         if (kb == null || !kb.eKey.wasPressedThisFrame) return;
+
+        var altar = ChallengeAltar.FindNearest(transform.position, ChallengeAltar.InteractRange);
+        if (altar != null)
+        {
+            altar.TryInteract();
+            return;
+        }
+
         var ore = OreNode.FindNearest(transform.position, 3.5f);
         if (ore == null) return;
         var inv = PlayerInventory.Instance;
@@ -317,14 +325,27 @@ public class PlayerController : MonoBehaviour
         }
 
         RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 560f, RPGUI.HintH),
-            "WASD move · Space jump · Attack · E mine · 1-4 travel · I bag", RPGUI.Hint);
+            "WASD move · Space jump · Attack · E interact · 1-4 travel · I bag", RPGUI.Hint);
 
-        var nearOre = OreNode.FindNearest(transform.position, 3.5f);
-        if (nearOre != null && !nearOre.IsDepleted)
+        var nearAltar = ChallengeAltar.FindNearest(transform.position, ChallengeAltar.InteractRange);
+        if (nearAltar != null && !nearAltar.IsRunning)
         {
-            Rect tip = new Rect(Screen.width * 0.5f - 240f, Screen.height * 0.72f, 480f, 40f);
-            RPGUI.DrawPanel(tip, new Color(0.08f, 0.14f, 0.2f, 0.9f));
-            RPGUI.DrawText(tip, $"Press E to mine — {nearOre.HitsLeft} hits left", RPGUI.Hint);
+            Rect tip = new Rect(Screen.width * 0.5f - 300f, Screen.height * 0.72f, 600f, 40f);
+            RPGUI.DrawPanel(tip, new Color(0.22f, 0.1f, 0.06f, 0.92f));
+            string msg = nearAltar.StatusText.StartsWith("Cooldown") || nearAltar.StatusText.StartsWith("Failed") || nearAltar.StatusText.StartsWith("Cleared")
+                ? nearAltar.StatusText
+                : "Press E — Timed Challenge (pet egg / legendary gem)";
+            RPGUI.DrawText(tip, msg, RPGUI.Hint);
+        }
+        else
+        {
+            var nearOre = OreNode.FindNearest(transform.position, 3.5f);
+            if (nearOre != null && !nearOre.IsDepleted)
+            {
+                Rect tip = new Rect(Screen.width * 0.5f - 240f, Screen.height * 0.72f, 480f, 40f);
+                RPGUI.DrawPanel(tip, new Color(0.08f, 0.14f, 0.2f, 0.9f));
+                RPGUI.DrawText(tip, $"Press E to mine — {nearOre.HitsLeft} hits left", RPGUI.Hint);
+            }
         }
 
         if (_stats.isDead)

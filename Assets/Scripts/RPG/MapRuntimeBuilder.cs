@@ -247,6 +247,8 @@ public class MapRuntimeBuilder : MonoBehaviour
 
         AddZoneDecor(zoneRoot, world, map, center, zoneSize);
         SpawnOreNodes(zoneRoot, world, map, center, zoneSize);
+        if (map == 2)
+            SpawnChallengeAltar(zoneRoot, world, map, center);
 
         var zone = new GameObject("TileZone_Map" + map);
         zone.transform.SetParent(zoneRoot, false);
@@ -742,6 +744,48 @@ public class MapRuntimeBuilder : MonoBehaviour
         // Prim parents under root but uses world pos — check Prim implementation
         var ore = root.AddComponent<OreNode>();
         ore.Configure(level, "Crystal Vein", tint);
+    }
+
+    void SpawnChallengeAltar(Transform parent, int world, int map, Vector3 center)
+    {
+        Vector3 pos = center + new Vector3(0f, 0f, -5.5f);
+        var root = new GameObject("ChallengeAltar");
+        root.transform.SetParent(parent, false);
+        root.transform.position = pos;
+
+        var stone = MakeTempMat(new Color(0.35f, 0.22f, 0.18f));
+        var glow = MakeTempMat(new Color(1f, 0.45f, 0.15f));
+        Prim(PrimitiveType.Cylinder, "Base", pos + new Vector3(0f, 0.35f, 0f), new Vector3(2.4f, 0.35f, 2.4f), stone, root.transform);
+        Prim(PrimitiveType.Cube, "Pillar", pos + new Vector3(0f, 1.4f, 0f), new Vector3(0.7f, 2.2f, 0.7f), stone, root.transform);
+        var flame = Prim(PrimitiveType.Sphere, "Flame", pos + new Vector3(0f, 2.7f, 0f), Vector3.one * 0.85f, glow, root.transform);
+        var flameCol = flame.GetComponent<Collider>();
+        if (flameCol != null) Object.Destroy(flameCol);
+
+        var altar = root.AddComponent<ChallengeAltar>();
+        altar.world = world;
+        altar.mapIndex = map;
+    }
+
+    /// <summary>Spawns a non-respawning challenge mob (used by ChallengeAltar waves).</summary>
+    public GameObject SpawnChallengeEnemy(string name, Vector3 pos, Vector3 zoneCenter, int level, bool isBoss, EnemyKind kind, int mapIndex)
+    {
+        Transform parent = _root != null ? _root : transform;
+        var go = CreateEnemy(parent, name, pos, zoneCenter, level, isBoss, kind, mapIndex);
+        if (go == null) return null;
+
+        var ai = go.GetComponent<EnemyAI>();
+        if (ai != null)
+        {
+            ai.disableAutoRespawn = true;
+            ai.leashRadius = 14f;
+            ai.homeCenter = zoneCenter;
+        }
+
+        var stats = go.GetComponent<CharacterStats>();
+        if (stats != null)
+            stats.isChallengeEnemy = true;
+
+        return go;
     }
 
     void SpawnEnemiesInZone(Transform parent, int world, int map, Vector3 center)

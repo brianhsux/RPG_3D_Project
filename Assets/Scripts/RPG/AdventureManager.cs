@@ -179,6 +179,13 @@ public class AdventureManager : MonoBehaviour
         if (stats == null || stats.isPlayer) return;
         killCount++;
 
+        if (stats.isChallengeEnemy)
+        {
+            if (ChallengeAltar.Active != null)
+                ChallengeAltar.Active.NotifyEnemyKilled(stats);
+            return;
+        }
+
         if (stats.isBoss)
         {
             int map = stats.mapIndex > 0 ? stats.mapIndex : currentMap;
@@ -264,8 +271,10 @@ public class AdventureManager : MonoBehaviour
         RPGUI.DrawText(new Rect(x + 170f, y - 2f, textW - 170f, RPGUI.HintH), bossText, RPGUI.Hint);
         y += 28f;
 
-        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH),
-            currentMap == 3 ? "1–4 travel · Map 3 has crystal mines (E)" : "1–4 Teleport zones", RPGUI.FieldTag);
+        string tipText = "1–4 Teleport zones";
+        if (currentMap == 2) tipText = "1–4 travel · Map 2 Timed Challenge altar (E)";
+        else if (currentMap == 3) tipText = "1–4 travel · Map 3 has crystal mines (E)";
+        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH), tipText, RPGUI.FieldTag);
 
         if (worldPortalReady)
         {

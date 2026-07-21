@@ -209,13 +209,20 @@ public static class ProgressionFormulas
         return WorldThemeName(world) + " · " + zone;
     }
 
-    // ---- Player XP / Level ----
-    public const int MaxPlayerLevel = 60;
+    // ---- Player XP / Level (no hard cap — soft XP curve forever) ----
+    /// <summary>Soft display hint only; leveling is uncapped.</summary>
+    public const int SoftLevelMilestone = 60;
 
     public static int XpToNextLevel(int level)
     {
-        level = Mathf.Clamp(level, 1, MaxPlayerLevel);
-        return Mathf.RoundToInt(35f + level * 28f + level * level * 1.8f);
+        level = Mathf.Max(1, level);
+        // Soft curve: grows smoothly at high levels without a ceiling.
+        float linear = level * 28f;
+        float quad = level * level * 1.8f;
+        float late = level > SoftLevelMilestone
+            ? (level - SoftLevelMilestone) * (level - SoftLevelMilestone) * 0.35f
+            : 0f;
+        return Mathf.Max(40, Mathf.RoundToInt(35f + linear + quad + late));
     }
 
     public static int MobXpReward(int contentLevel, bool isBoss)
@@ -224,9 +231,9 @@ public static class ProgressionFormulas
         return isBoss ? xp * 5 : xp;
     }
 
-    public static float PlayerLevelBonusAtk(int level) => (level - 1) * 2.2f;
-    public static float PlayerLevelBonusDef(int level) => (level - 1) * 1.4f;
-    public static float PlayerLevelBonusHp(int level) => (level - 1) * 18f;
+    public static float PlayerLevelBonusAtk(int level) => Mathf.Max(0, level - 1) * 2.2f;
+    public static float PlayerLevelBonusDef(int level) => Mathf.Max(0, level - 1) * 1.4f;
+    public static float PlayerLevelBonusHp(int level) => Mathf.Max(0, level - 1) * 18f;
 }
 
 public enum EnemyKind

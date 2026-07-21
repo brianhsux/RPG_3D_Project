@@ -27,6 +27,7 @@ public class CharacterStats : MonoBehaviour
 
     public int contentLevel = 1;
     public bool isBoss;
+    public bool isChallengeEnemy;
     public EnemyKind enemyKind = EnemyKind.Slime;
     public int mapIndex = 1;
 

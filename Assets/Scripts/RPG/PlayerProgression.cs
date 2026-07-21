@@ -1,13 +1,12 @@
 using UnityEngine;
 
 /// <summary>
-/// Player experience and level-ups. Stat bonuses stack with equipment.
+/// Player experience and level-ups. No hard level cap.
 /// </summary>
 public class PlayerProgression : MonoBehaviour
 {
     public static PlayerProgression Instance { get; private set; }
 
-    // Runtime-only so exiting Play Mode can't restore scene defaults over saves.
     [System.NonSerialized] public int level = 1;
     [System.NonSerialized] public int xp;
     [System.NonSerialized] public int xpToNext = 40;
@@ -31,29 +30,25 @@ public class PlayerProgression : MonoBehaviour
 
     public void ApplySave(int savedLevel, int savedXp)
     {
-        level = Mathf.Clamp(savedLevel, 1, ProgressionFormulas.MaxPlayerLevel);
+        level = Mathf.Max(1, savedLevel);
         xpToNext = ProgressionFormulas.XpToNextLevel(level);
         xp = Mathf.Clamp(savedXp, 0, Mathf.Max(0, xpToNext - 1));
-        if (level >= ProgressionFormulas.MaxPlayerLevel)
-            xp = 0;
     }
 
     public void GainXp(int amount)
     {
-        if (amount <= 0 || level >= ProgressionFormulas.MaxPlayerLevel) return;
+        if (amount <= 0) return;
 
         xp += amount;
         bool leveled = false;
-        while (xp >= xpToNext && level < ProgressionFormulas.MaxPlayerLevel)
+        int safety = 0;
+        while (xp >= xpToNext && safety++ < 1000)
         {
             xp -= xpToNext;
             level++;
             xpToNext = ProgressionFormulas.XpToNextLevel(level);
             leveled = true;
         }
-
-        if (level >= ProgressionFormulas.MaxPlayerLevel)
-            xp = 0;
 
         if (PlayerInventory.Instance != null)
         {
@@ -69,7 +64,6 @@ public class PlayerProgression : MonoBehaviour
             _msgUntil = Time.time + 3f;
         }
 
-        // Persist XP / level after every gain (not only level-ups).
         if (AccountManager.Instance != null && AccountManager.Instance.IsReady)
             AccountManager.Instance.SaveActive(silent: true);
     }
