@@ -238,6 +238,10 @@ public class AccountManager : MonoBehaviour
         if (inv != null)
             inv.WriteToSave(data);
 
+        var pets = PlayerPetController.Instance;
+        if (pets != null)
+            pets.WriteToSave(data);
+
         var player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
@@ -258,6 +262,10 @@ public class AccountManager : MonoBehaviour
         var inv = PlayerInventory.Instance;
         if (inv != null)
             inv.ApplySave(data);
+
+        var pets = PlayerPetController.Instance;
+        if (pets != null)
+            pets.ApplySave(data);
 
         var adv = AdventureManager.Instance;
         if (adv != null)
@@ -410,6 +418,10 @@ public class AccountManager : MonoBehaviour
         var inv = PlayerInventory.Instance;
         if (inv != null)
             inv.ResetToStarter();
+
+        var pets = PlayerPetController.Instance;
+        if (pets != null)
+            pets.ResetToStarter();
 
         var adv = AdventureManager.Instance;
         if (adv != null)

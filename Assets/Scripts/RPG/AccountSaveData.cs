@@ -130,6 +130,9 @@ public class AccountSaveData
     public ItemSaveData weapon;
     public ItemSaveData armor;
     public ItemSaveData[] bag = Array.Empty<ItemSaveData>();
+
+    public PetSaveData[] pets = Array.Empty<PetSaveData>();
+    public string activePetId;
 }
 
 [Serializable]

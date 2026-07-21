@@ -26,9 +26,13 @@ public class PlayerInventory : MonoBehaviour
 
         if (GetComponent<PlayerProgression>() == null)
             gameObject.AddComponent<PlayerProgression>();
+        if (GetComponent<PlayerPetController>() == null)
+            gameObject.AddComponent<PlayerPetController>();
 
         if (bag == null) bag = new List<ItemInstance>();
         ResetToStarter();
+        if (PlayerPetController.Instance != null)
+            PlayerPetController.Instance.ResetToStarter();
     }
 
     public void ResetToStarter()
@@ -125,7 +129,7 @@ public class PlayerInventory : MonoBehaviour
         if (item.slot == ItemSlot.Gem)
         {
             _selectedGemBagIndex = index;
-            _bagTabGems = true;
+            _bagTab = 1;
             ShowLoot($"Selected {item.displayName} — click an empty (+) socket on Weapon/Armor");
             return;
         }
@@ -478,8 +482,9 @@ public class PlayerInventory : MonoBehaviour
     public bool showPanel;
     Vector2 _bagScroll;
     Vector2 _gemScroll;
+    Vector2 _petScroll;
     int _selectedGemBagIndex = -1;
-    bool _bagTabGems; // false = gear (weapons/armor), true = gems
+    int _bagTab; // 0 gear, 1 gems, 2 pets
 
     public void SetPanelOpen(bool open)
     {
@@ -489,7 +494,7 @@ public class PlayerInventory : MonoBehaviour
         if (!open)
         {
             _selectedGemBagIndex = -1;
-            _bagTabGems = false;
+            _bagTab = 0;
         }
     }
 
@@ -590,21 +595,28 @@ public class PlayerInventory : MonoBehaviour
             if (bag[i].slot == ItemSlot.Gem) gemCount++;
             else gearCount++;
         }
+        int petCount = PlayerPetController.Instance != null ? PlayerPetController.Instance.owned.Count : 0;
 
-        // Tabs: Gear | Gems
-        float tabW = 160f;
+        // Tabs: Gear | Gems | Pets
+        float tabW = 140f;
         float tabH = RPGUI.ButtonSmH;
-        if (RPGUI.Button(new Rect(panel.x + pad, y, tabW, tabH), $"Gear ({gearCount})", !_bagTabGems))
-            _bagTabGems = false;
-        if (RPGUI.Button(new Rect(panel.x + pad + tabW + 10f, y, tabW, tabH), $"Gems ({gemCount})", _bagTabGems))
-            _bagTabGems = true;
+        if (RPGUI.Button(new Rect(panel.x + pad, y, tabW, tabH), $"Gear ({gearCount})", _bagTab == 0))
+            _bagTab = 0;
+        if (RPGUI.Button(new Rect(panel.x + pad + tabW + 8f, y, tabW, tabH), $"Gems ({gemCount})", _bagTab == 1))
+            _bagTab = 1;
+        if (RPGUI.Button(new Rect(panel.x + pad + (tabW + 8f) * 2f, y, tabW, tabH), $"Pets ({petCount})", _bagTab == 2))
+            _bagTab = 2;
         y += tabH + 8f;
 
         int craftable = CountCraftableBatches();
         int upgradeCount = CountUpgradesInBag();
-        string bagHint = _bagTabGems
-            ? $"Gems {gemCount}  |  Select a gem, then click an empty socket on equipped gear"
-            : $"Gear {gearCount}  |  {upgradeCount} upgrade(s)  |  Left: Equip";
+        string bagHint;
+        if (_bagTab == 1)
+            bagHint = $"Gems {gemCount}  |  Select a gem, then click an empty socket on equipped gear";
+        else if (_bagTab == 2)
+            bagHint = $"Pets {petCount}/{PlayerPetController.MaxPets}  |  Deploy one combat pet  |  Bosses can drop/upgrade pets";
+        else
+            bagHint = $"Gear {gearCount}  |  {upgradeCount} upgrade(s)  |  Equip from list";
         RPGUI.DrawText(new Rect(panel.x + pad, y, w - pad * 2f, RPGUI.HintH), bagHint, RPGUI.Hint);
         y += RPGUI.HintH + 6f;
 
@@ -614,38 +626,42 @@ public class PlayerInventory : MonoBehaviour
         float rowH = 96f;
         float contentW = w - pad * 2f - 20f;
 
-        // Build filtered index list for current tab
-        var visible = new System.Collections.Generic.List<int>(bag.Count);
-        for (int i = 0; i < bag.Count; i++)
-        {
-            if (bag[i] == null) continue;
-            bool isGem = bag[i].slot == ItemSlot.Gem;
-            if (_bagTabGems == isGem)
-                visible.Add(i);
-        }
-
-        float contentH = Mathf.Max(viewH, visible.Count * rowH + 8f);
-        Rect viewRect = new Rect(panel.x + pad, listTop, w - pad * 2f, viewH);
-        if (_bagTabGems)
-            _gemScroll = GUI.BeginScrollView(viewRect, _gemScroll, new Rect(0f, 0f, contentW, contentH), false, true);
+        if (_bagTab == 2)
+            DrawPetsTab(panel.x + pad, listTop, w - pad * 2f, viewH, contentW, rowH);
         else
-            _bagScroll = GUI.BeginScrollView(viewRect, _bagScroll, new Rect(0f, 0f, contentW, contentH), false, true);
-
-        for (int v = 0; v < visible.Count; v++)
         {
-            int bagIndex = visible[v];
-            DrawItemLine(0f, v * rowH, contentW - 4f, bag[bagIndex], bagIndex);
-        }
+            var visible = new List<int>(bag.Count);
+            for (int i = 0; i < bag.Count; i++)
+            {
+                if (bag[i] == null) continue;
+                bool isGem = bag[i].slot == ItemSlot.Gem;
+                if ((_bagTab == 1) == isGem)
+                    visible.Add(i);
+            }
 
-        if (visible.Count == 0)
-        {
-            string empty = _bagTabGems
-                ? "No gems — mine crystal ores on Map 3 (press E)"
-                : "No gear — defeat monsters for weapons and armor";
-            RPGUI.DrawText(new Rect(8f, 16f, contentW - 16f, RPGUI.HintH), empty, RPGUI.Hint);
-        }
+            float contentH = Mathf.Max(viewH, visible.Count * rowH + 8f);
+            Rect viewRect = new Rect(panel.x + pad, listTop, w - pad * 2f, viewH);
+            if (_bagTab == 1)
+                _gemScroll = GUI.BeginScrollView(viewRect, _gemScroll, new Rect(0f, 0f, contentW, contentH), false, true);
+            else
+                _bagScroll = GUI.BeginScrollView(viewRect, _bagScroll, new Rect(0f, 0f, contentW, contentH), false, true);
 
-        GUI.EndScrollView();
+            for (int v = 0; v < visible.Count; v++)
+            {
+                int bagIndex = visible[v];
+                DrawItemLine(0f, v * rowH, contentW - 4f, bag[bagIndex], bagIndex);
+            }
+
+            if (visible.Count == 0)
+            {
+                string empty = _bagTab == 1
+                    ? "No gems — mine crystal ores on Map 3 (press E)"
+                    : "No gear — defeat monsters for weapons and armor";
+                RPGUI.DrawText(new Rect(8f, 16f, contentW - 16f, RPGUI.HintH), empty, RPGUI.Hint);
+            }
+
+            GUI.EndScrollView();
+        }
 
         float btnY = panel.yMax - 66f;
         float btnGap = 12f;
@@ -658,6 +674,55 @@ public class PlayerInventory : MonoBehaviour
             AutoSynthesizeAll();
 
         GUI.depth = prevDepth;
+    }
+
+    void DrawPetsTab(float x, float listTop, float viewW, float viewH, float contentW, float rowH)
+    {
+        var pets = PlayerPetController.Instance;
+        int count = pets != null ? pets.owned.Count : 0;
+        float contentH = Mathf.Max(viewH, count * rowH + 8f);
+        Rect viewRect = new Rect(x, listTop, viewW, viewH);
+        _petScroll = GUI.BeginScrollView(viewRect, _petScroll, new Rect(0f, 0f, contentW, contentH), false, true);
+
+        if (pets == null || count == 0)
+        {
+            RPGUI.DrawText(new Rect(8f, 16f, contentW - 16f, RPGUI.HintH),
+                "No pets — starter Ember Fox should appear; defeat bosses for more", RPGUI.Hint);
+            GUI.EndScrollView();
+            return;
+        }
+
+        float playerAtk = _stats != null ? _stats.attackDamage : 20f;
+        for (int i = 0; i < pets.owned.Count; i++)
+        {
+            var pet = pets.owned[i];
+            if (pet == null) continue;
+            float yy = i * rowH;
+            bool active = pets.activePetId == pet.id;
+
+            Rect r = new Rect(0f, yy, contentW - 4f, rowH - 6f);
+            RPGUI.DrawPanel(r, active ? new Color(0.14f, 0.22f, 0.18f, 0.98f) : new Color(0.11f, 0.12f, 0.16f, 0.95f), false);
+            RPGUI.Fill(new Rect(r.x, r.y, 5f, r.height), PetCatalog.KindColor(pet.kind));
+
+            // Mini icon block
+            RPGUI.Fill(new Rect(r.x + 12f, r.y + 14f, 56f, 56f), new Color(0.08f, 0.08f, 0.1f));
+            RPGUI.Fill(new Rect(r.x + 22f, r.y + 24f, 36f, 36f), PetCatalog.KindColor(pet.kind));
+
+            GUI.color = PetCatalog.KindColor(pet.kind);
+            RPGUI.DrawText(new Rect(r.x + 80f, r.y + 8f, contentW - 220f, RPGUI.ItemNameH),
+                pet.displayName + (active ? "  [ACTIVE]" : ""), RPGUI.ItemName);
+            GUI.color = Color.white;
+
+            RPGUI.DrawText(new Rect(r.x + 80f, r.y + 48f, contentW - 220f, RPGUI.ItemMetaH),
+                PetCatalog.StatsLine(pet, playerAtk), RPGUI.ItemMeta);
+
+            if (!active && RPGUI.ButtonSm(new Rect(r.xMax - 110f, r.y + 24f, 100f, RPGUI.ButtonSmH), "Deploy", true))
+                pets.SetActive(pet.id);
+            else if (active)
+                RPGUI.DrawChip(new Rect(r.xMax - 110f, r.y + 28f, 100f, 26f), "Fighting", RPGUI.Good);
+        }
+
+        GUI.EndScrollView();
     }
 
     int CountUpgradesInBag()
@@ -926,7 +991,7 @@ public class PlayerInventory : MonoBehaviour
                 RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), btn, !selected))
             {
                 _selectedGemBagIndex = selected ? -1 : bagIndex;
-                if (!selected) _bagTabGems = true;
+                if (!selected) _bagTab = 1;
             }
 
             // Also: quick socket into first empty if already selected and click again? handled by Cancel/Select

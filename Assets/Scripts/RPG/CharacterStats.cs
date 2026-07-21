@@ -168,6 +168,19 @@ public class CharacterStats : MonoBehaviour
         {
             TryDropLoot();
             GrantXpToPlayer();
+            if (PlayerPetController.Instance != null)
+            {
+                PlayerPetController.Instance.OnEnemyKilledNearby(transform.position, isBoss);
+                if (isBoss && Random.value < 0.55f)
+                {
+                    int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
+                    var kind = PlayerPetController.RollBossPetKind(world);
+                    int lv = Mathf.Clamp(contentLevel / 2, 1, 20);
+                    PlayerPetController.Instance.TryAddPet(kind, lv, out _);
+                    if (AccountManager.Instance != null)
+                        AccountManager.Instance.SaveActive(silent: true);
+                }
+            }
         }
 
         Died?.Invoke(this);

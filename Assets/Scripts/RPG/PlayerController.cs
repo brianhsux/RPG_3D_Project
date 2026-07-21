@@ -32,6 +32,8 @@ public class PlayerController : MonoBehaviour
             gameObject.AddComponent<PlayerInventory>();
         if (GetComponent<PlayerProgression>() == null)
             gameObject.AddComponent<PlayerProgression>();
+        if (GetComponent<PlayerPetController>() == null)
+            gameObject.AddComponent<PlayerPetController>();
         _weaponVisual = GetComponent<PlayerWeaponVisual>();
         if (_weaponVisual == null)
             _weaponVisual = gameObject.AddComponent<PlayerWeaponVisual>();
@@ -303,6 +305,15 @@ public class PlayerController : MonoBehaviour
             float eqY = barY + (prog != null ? 60f : 34f);
             DrawHudEquip(panel.x + 14f, eqY, 180f, "WPN", inv.equippedWeapon);
             DrawHudEquip(panel.x + 206f, eqY, 180f, "ARM", inv.equippedArmor);
+        }
+
+        var petCtrl = PlayerPetController.Instance;
+        if (petCtrl != null && petCtrl.ActivePet != null)
+        {
+            var pet = petCtrl.ActivePet;
+            RPGUI.DrawText(new Rect(16f, panel.yMax + 28f, 400f, RPGUI.FieldTagH),
+                $"Pet: {pet.displayName} Lv{pet.level}  (~{PetCatalog.ComputeDamage(pet, _stats.attackDamage):0} dmg)",
+                RPGUI.FieldTag);
         }
 
         RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 560f, RPGUI.HintH),
