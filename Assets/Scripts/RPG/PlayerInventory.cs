@@ -427,6 +427,8 @@ public class PlayerInventory : MonoBehaviour
             _stats.currentHealth = _stats.maxHealth;
         else
             _stats.currentHealth = Mathf.Min(_stats.currentHealth, _stats.maxHealth);
+
+        NetworkPlayerCombat.RefreshLocalOwnerStats();
     }
 
     /// <summary>

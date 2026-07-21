@@ -1,22 +1,41 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
 
 /// <summary>
-/// Host-only: register NetworkEnemy prefab and spawn adventure / sandbox enemies.
+/// Host-only: register NetworkEnemy prefab, spawn adventure enemies, schedule respawns.
 /// </summary>
 public class NetCombatSession : MonoBehaviour
 {
     public const string EnemyPrefabResource = "NetworkEnemy";
+    public const float DefaultRespawnDelay = 6f;
 
     public static NetCombatSession Instance { get; private set; }
 
     [Tooltip("Optional. If null, loads Resources/NetworkEnemy or builds a runtime template.")]
     public GameObject enemyPrefab;
 
+    public float enemyRespawnDelay = DefaultRespawnDelay;
+
     GameObject _runtimeEnemyTemplate;
     readonly List<NetworkObject> _spawned = new List<NetworkObject>();
+    readonly List<Coroutine> _respawnJobs = new List<Coroutine>();
+
+    public struct EnemySpawnSpec
+    {
+        public string name;
+        public Vector3 pos;
+        public Vector3 zoneCenter;
+        public int level;
+        public bool isBoss;
+        public EnemyKind kind;
+        public int mapIndex;
+        public float moveSpeed;
+        public float leashRadius;
+        public bool allowRespawn;
+    }
 
     void Awake()
     {
@@ -26,6 +45,8 @@ public class NetCombatSession : MonoBehaviour
             return;
         }
         Instance = this;
+        if (GameManager.Instance != null)
+            enemyRespawnDelay = GameManager.Instance.enemyRespawnDelay;
     }
 
     void OnDestroy()
@@ -51,7 +72,6 @@ public class NetCombatSession : MonoBehaviour
         var nm = NetworkManager.Singleton;
         if (nm == null || !nm.IsServer) return;
         RegisterPrefabs(nm);
-        // Convert any already-built local adventure mobs into network spawns.
         CancelInvoke(nameof(ConvertLocalWorldEnemies));
         Invoke(nameof(ConvertLocalWorldEnemies), 0.2f);
     }
@@ -59,12 +79,24 @@ public class NetCombatSession : MonoBehaviour
     public void OnShutdown()
     {
         CancelInvoke(nameof(ConvertLocalWorldEnemies));
+        CancelAllRespawns();
         DespawnAllAdventureEnemies();
+    }
+
+    public void CancelAllRespawns()
+    {
+        for (int i = 0; i < _respawnJobs.Count; i++)
+        {
+            if (_respawnJobs[i] != null)
+                StopCoroutine(_respawnJobs[i]);
+        }
+        _respawnJobs.Clear();
     }
 
     public void DespawnAllAdventureEnemies()
     {
         if (!NetPlay.IsServer) return;
+        CancelAllRespawns();
 
         for (int i = _spawned.Count - 1; i >= 0; i--)
         {
@@ -74,7 +106,6 @@ public class NetCombatSession : MonoBehaviour
         }
         _spawned.Clear();
 
-        // Also catch any NetworkEnemy not tracked (e.g. after domain reload).
         var enemies = FindObjectsByType<NetworkEnemy>(FindObjectsSortMode.None);
         for (int i = 0; i < enemies.Length; i++)
         {
@@ -84,7 +115,6 @@ public class NetCombatSession : MonoBehaviour
         }
     }
 
-    /// <summary>Destroy local (non-network) EnemyAI and re-run zone enemy spawns as NetworkEnemy.</summary>
     public void ConvertLocalWorldEnemies()
     {
         if (!NetPlay.IsServer) return;
@@ -107,6 +137,24 @@ public class NetCombatSession : MonoBehaviour
         }
     }
 
+    public void ScheduleRespawn(EnemySpawnSpec spec, float delaySeconds = -1f)
+    {
+        if (!NetPlay.IsServer) return;
+        if (!spec.allowRespawn) return;
+        float delay = delaySeconds > 0f ? delaySeconds : enemyRespawnDelay;
+        var job = StartCoroutine(RespawnAfterDelay(spec, delay));
+        _respawnJobs.Add(job);
+    }
+
+    IEnumerator RespawnAfterDelay(EnemySpawnSpec spec, float delay)
+    {
+        yield return new WaitForSeconds(Mathf.Max(0.5f, delay));
+        if (!NetPlay.IsServer) yield break;
+        SpawnAdventureEnemy(
+            spec.name, spec.pos, spec.zoneCenter, spec.level, spec.isBoss,
+            spec.kind, spec.mapIndex, spec.moveSpeed, spec.leashRadius, spec.allowRespawn);
+    }
+
     public GameObject SpawnAdventureEnemy(
         string name,
         Vector3 pos,
@@ -116,7 +164,8 @@ public class NetCombatSession : MonoBehaviour
         EnemyKind kind,
         int mapIndex,
         float moveSpeed,
-        float leashRadius)
+        float leashRadius,
+        bool allowRespawn = true)
     {
         if (!NetPlay.IsServer) return null;
 
@@ -134,7 +183,6 @@ public class NetCombatSession : MonoBehaviour
         var go = Instantiate(prefab, pos, Quaternion.identity);
         go.name = name;
         go.SetActive(true);
-        // Do NOT SetParent before Spawn — NGO forbids re-parenting unspawned NetworkObjects.
 
         var enemy = go.GetComponent<NetworkEnemy>();
         if (enemy == null)
@@ -144,7 +192,8 @@ public class NetCombatSession : MonoBehaviour
             return null;
         }
 
-        enemy.ConfigureAdventureBeforeSpawn(kind, level, isBoss, mapIndex, zoneCenter, moveSpeed, leashRadius);
+        enemy.ConfigureAdventureBeforeSpawn(
+            kind, level, isBoss, mapIndex, zoneCenter, moveSpeed, leashRadius, pos, name, allowRespawn);
 
         var no = go.GetComponent<NetworkObject>();
         if (no == null)
@@ -154,8 +203,6 @@ public class NetCombatSession : MonoBehaviour
         }
 
         no.Spawn(true);
-        // Keep enemies unparented: parenting a NetworkObject to a plain Transform is fragile,
-        // and map rebuild already despawns via NetCombatSession tracking.
         _spawned.Add(no);
         return go;
     }

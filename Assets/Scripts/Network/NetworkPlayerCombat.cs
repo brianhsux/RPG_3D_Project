@@ -4,30 +4,33 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Owner requests attacks via ServerRpc; Host validates range/cooldown and applies damage.
-/// Player HP is Host-authoritative.
+/// Combat stats sync from the owner's local gear CharacterStats.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class NetworkPlayerCombat : NetworkBehaviour
 {
     public const float DefaultMaxHp = 100f;
-    public const float AttackRange = 2.6f;
-    public const float AttackCooldown = 0.5f;
-    public const float AttackDamage = 12f;
+    public const float DefaultAttack = 12f;
+    public const float DefaultAttackRange = 2.6f;
+    public const float DefaultAttackCooldown = 0.5f;
     public const float RespawnDelay = 3f;
+    const float StatsSyncInterval = 0.5f;
 
     public NetworkVariable<float> CurrentHp = new NetworkVariable<float>(
-        DefaultMaxHp,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
-
+        DefaultMaxHp, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<float> MaxHp = new NetworkVariable<float>(
-        DefaultMaxHp,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
+        DefaultMaxHp, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> AttackPower = new NetworkVariable<float>(
+        DefaultAttack, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> AttackRangeNv = new NetworkVariable<float>(
+        DefaultAttackRange, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> AttackCooldownNv = new NetworkVariable<float>(
+        DefaultAttackCooldown, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     float _clientNextAttackTime;
     float _serverNextAttackTime;
     float _respawnAt = -1f;
+    float _nextStatsSync;
     Renderer _bodyRenderer;
     Color _aliveColor = new Color(0.35f, 0.75f, 0.95f);
     Color _deadColor = new Color(0.35f, 0.35f, 0.38f);
@@ -35,6 +38,16 @@ public class NetworkPlayerCombat : NetworkBehaviour
     public bool IsAlive => IsSpawned && CurrentHp.Value > 0f;
     public float HealthPercent =>
         MaxHp.Value > 0.01f ? Mathf.Clamp01(CurrentHp.Value / MaxHp.Value) : 0f;
+
+    public static void RefreshLocalOwnerStats()
+    {
+        var combats = Object.FindObjectsByType<NetworkPlayerCombat>(FindObjectsSortMode.None);
+        for (int i = 0; i < combats.Length; i++)
+        {
+            if (combats[i] != null && combats[i].IsSpawned && combats[i].IsOwner)
+                combats[i].PushLocalStatsToServer();
+        }
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -45,6 +58,15 @@ public class NetworkPlayerCombat : NetworkBehaviour
         {
             if (MaxHp.Value <= 0f) MaxHp.Value = DefaultMaxHp;
             if (CurrentHp.Value <= 0f) CurrentHp.Value = MaxHp.Value;
+            if (AttackPower.Value <= 0f) AttackPower.Value = DefaultAttack;
+            if (AttackRangeNv.Value <= 0f) AttackRangeNv.Value = DefaultAttackRange;
+            if (AttackCooldownNv.Value <= 0f) AttackCooldownNv.Value = DefaultAttackCooldown;
+        }
+
+        if (IsOwner)
+        {
+            _nextStatsSync = 0f;
+            PushLocalStatsToServer();
         }
 
         ApplyDeathVisual(!IsAlive);
@@ -70,29 +92,72 @@ public class NetworkPlayerCombat : NetworkBehaviour
             CurrentHp.Value = MaxHp.Value;
         }
 
+        if (IsOwner && Time.time >= _nextStatsSync)
+        {
+            _nextStatsSync = Time.time + StatsSyncInterval;
+            PushLocalStatsToServer();
+        }
+
         if (!IsOwner || !IsAlive) return;
         if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel)
             return;
 
+        float range = AttackRangeNv.Value > 0.1f ? AttackRangeNv.Value : DefaultAttackRange;
+        float cd = AttackCooldownNv.Value > 0.05f ? AttackCooldownNv.Value : DefaultAttackCooldown;
+
         bool pressed = WasAttackPressed();
-        bool auto = HasEnemyInRange();
+        bool auto = HasEnemyInRange(range);
         if (!pressed && !auto) return;
         if (Time.time < _clientNextAttackTime) return;
 
-        _clientNextAttackTime = Time.time + AttackCooldown;
+        _clientNextAttackTime = Time.time + cd;
         AttackServerRpc();
+    }
+
+    public void PushLocalStatsToServer()
+    {
+        if (!IsOwner || !IsSpawned) return;
+        var stats = FindLocalPlayerStats();
+        if (stats == null) return;
+
+        float atk = Mathf.Max(1f, stats.attackDamage);
+        float range = Mathf.Max(1f, stats.attackRange);
+        float cd = Mathf.Max(0.15f, stats.EffectiveAttackCooldown);
+        float maxHp = Mathf.Max(1f, stats.maxHealth);
+        SyncCombatStatsServerRpc(atk, range, cd, maxHp);
+    }
+
+    [ServerRpc]
+    void SyncCombatStatsServerRpc(float attack, float range, float cooldown, float maxHp)
+    {
+        AttackPower.Value = Mathf.Max(1f, attack);
+        AttackRangeNv.Value = Mathf.Max(1f, range);
+        AttackCooldownNv.Value = Mathf.Max(0.15f, cooldown);
+
+        float prevMax = MaxHp.Value;
+        MaxHp.Value = Mathf.Max(1f, maxHp);
+        if (CurrentHp.Value <= 0f)
+            return;
+        if (prevMax <= 0.01f || CurrentHp.Value >= prevMax * 0.98f)
+            CurrentHp.Value = MaxHp.Value;
+        else
+            CurrentHp.Value = Mathf.Min(CurrentHp.Value, MaxHp.Value);
     }
 
     [ServerRpc]
     void AttackServerRpc()
     {
         if (!IsAlive) return;
+        float cd = AttackCooldownNv.Value > 0.05f ? AttackCooldownNv.Value : DefaultAttackCooldown;
         if (Time.time < _serverNextAttackTime) return;
-        _serverNextAttackTime = Time.time + AttackCooldown;
+        _serverNextAttackTime = Time.time + cd;
 
-        var enemy = FindNearestEnemyInRange(AttackRange);
+        float range = AttackRangeNv.Value > 0.1f ? AttackRangeNv.Value : DefaultAttackRange;
+        float dmg = AttackPower.Value > 0.1f ? AttackPower.Value : DefaultAttack;
+
+        var enemy = FindNearestEnemyInRange(range);
         if (enemy == null) return;
-        enemy.ApplyDamageServer(AttackDamage);
+        enemy.ApplyDamageServer(dmg, OwnerClientId);
     }
 
     /// <summary>Host-only damage entry used by NetworkEnemy AI.</summary>
@@ -108,6 +173,74 @@ public class NetworkPlayerCombat : NetworkBehaviour
 
         if (CurrentHp.Value <= 0f)
             _respawnAt = Time.time + RespawnDelay;
+    }
+
+    /// <summary>Host routes kill loot/XP to this player's owning client.</summary>
+    public void DeliverKillRewardsServer(
+        int xp,
+        string lootJson1,
+        string lootJson2,
+        bool bossPet,
+        int petKind,
+        int petLv,
+        Vector3 killPos,
+        bool wasBoss)
+    {
+        if (!IsServer) return;
+        var rpcParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        };
+        ReceiveKillRewardClientRpc(xp, lootJson1 ?? "", lootJson2 ?? "", bossPet, petKind, petLv, killPos, wasBoss, rpcParams);
+    }
+
+    [ClientRpc]
+    void ReceiveKillRewardClientRpc(
+        int xp,
+        string lootJson1,
+        string lootJson2,
+        bool bossPet,
+        int petKind,
+        int petLv,
+        Vector3 killPos,
+        bool wasBoss,
+        ClientRpcParams rpcParams = default)
+    {
+        if (PlayerProgression.Instance != null && xp > 0)
+            PlayerProgression.Instance.GainXp(xp);
+
+        TryAddLootFromJson(lootJson1);
+        TryAddLootFromJson(lootJson2);
+
+        if (PlayerPetController.Instance != null)
+        {
+            PlayerPetController.Instance.OnEnemyKilledNearby(killPos, wasBoss);
+            if (bossPet)
+            {
+                PlayerPetController.Instance.TryAddPet((PetKind)petKind, petLv, out _);
+                if (AccountManager.Instance != null)
+                    AccountManager.Instance.SaveActive(silent: true);
+            }
+        }
+
+        if (AccountManager.Instance != null && (xp > 0 || !string.IsNullOrEmpty(lootJson1)))
+            AccountManager.Instance.SaveActive(silent: true);
+    }
+
+    static void TryAddLootFromJson(string json)
+    {
+        if (string.IsNullOrEmpty(json)) return;
+        ItemSaveData data;
+        try { data = JsonUtility.FromJson<ItemSaveData>(json); }
+        catch { return; }
+        if (data == null || !data.IsValid) return;
+        var item = data.ToItem();
+        if (item == null) return;
+        if (PlayerInventory.Instance != null)
+            PlayerInventory.Instance.AddItem(item);
     }
 
     [ClientRpc]
@@ -135,11 +268,10 @@ public class NetworkPlayerCombat : NetworkBehaviour
         return best;
     }
 
-    bool HasEnemyInRange()
+    bool HasEnemyInRange(float range)
     {
-        // Client-side hint for auto-attack; server re-validates.
         var enemies = FindObjectsByType<NetworkEnemy>(FindObjectsSortMode.None);
-        float rangeSq = AttackRange * AttackRange;
+        float rangeSq = range * range;
         for (int i = 0; i < enemies.Length; i++)
         {
             var e = enemies[i];
@@ -148,6 +280,26 @@ public class NetworkPlayerCombat : NetworkBehaviour
                 return true;
         }
         return false;
+    }
+
+    static CharacterStats FindLocalPlayerStats()
+    {
+        // Prefer the suspended solo hero (still holds gear stats).
+        var players = GameObject.FindGameObjectsWithTag("Player");
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (players[i] == null) continue;
+            if (players[i].GetComponent<NetworkPlayer>() != null) continue;
+            var stats = players[i].GetComponent<CharacterStats>();
+            if (stats != null && stats.isPlayer) return stats;
+        }
+
+        if (PlayerInventory.Instance != null)
+        {
+            var stats = PlayerInventory.Instance.GetComponent<CharacterStats>();
+            if (stats != null) return stats;
+        }
+        return null;
     }
 
     static bool WasAttackPressed()
