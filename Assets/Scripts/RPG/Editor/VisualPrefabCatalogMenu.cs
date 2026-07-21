@@ -32,7 +32,7 @@ public static class VisualPrefabCatalogMenu
         {
             EditorUtility.DisplayDialog(
                 "Polytope Studio",
-                "找不到 Assets/Polytope Studio/Lowpoly_Environments/Prefabs。",
+                "Could not find Assets/Polytope Studio/Lowpoly_Environments/Prefabs.",
                 "OK");
             return;
         }
@@ -103,7 +103,7 @@ public static class VisualPrefabCatalogMenu
         {
             EditorUtility.DisplayDialog(
                 "Simple Nature Pack",
-                "找不到 Assets/SimpleNaturePack/Prefabs。\n請確認已匯入 Low-Poly Simple Nature Pack。",
+                "Could not find Assets/SimpleNaturePack/Prefabs.\nMake sure Low-Poly Simple Nature Pack is imported.",
                 "OK");
             return;
         }

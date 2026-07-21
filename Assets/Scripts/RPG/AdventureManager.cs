@@ -196,8 +196,8 @@ public class AdventureManager : MonoBehaviour
             if (PlayerInventory.Instance != null)
             {
                 string msg = map == 4
-                    ? "擊敗世界 Boss！傳送門已開啟"
-                    : $"擊敗地圖 {map} Boss！";
+                    ? "World Boss defeated! Portal opened"
+                    : $"Map {map} Boss defeated!";
                 PlayerInventory.Instance.ShowLoot(msg);
             }
 
@@ -214,7 +214,7 @@ public class AdventureManager : MonoBehaviour
         highestWorldUnlocked = Mathf.Max(highestWorldUnlocked, next);
         LoadWorld(next, 1);
         if (PlayerInventory.Instance != null)
-            PlayerInventory.Instance.ShowLoot($"進入 {ProgressionFormulas.WorldThemeName(next)}！");
+            PlayerInventory.Instance.ShowLoot($"Entered {ProgressionFormulas.WorldThemeName(next)}!");
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
     }
@@ -235,55 +235,49 @@ public class AdventureManager : MonoBehaviour
     void OnGUI()
     {
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady) return;
+        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
 
         RPGUI.Ensure();
 
-        float panelW = 560f;
-        float panelH = 300f;
-        Rect panel = new Rect(Screen.width - panelW - 20f, 20f, panelW, panelH);
-        RPGUI.DrawPanel(panel, new Color(0.07f, 0.06f, 0.12f, 0.9f));
+        float panelW = 380f;
+        float panelH = 168f;
+        Rect panel = new Rect(Screen.width - panelW - 16f, 16f, panelW, panelH);
+        RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
-        float y = panel.y + 14f;
-        float x = panel.x + 18f;
-        float textW = panelW - 36f;
+        float x = panel.x + 14f;
+        float y = panel.y + 10f;
+        float textW = panelW - 28f;
 
-        GUI.Label(new Rect(x, y, textW, RPGUI.TitleH),
-            ProgressionFormulas.MapName(currentWorld, currentMap), RPGUI.Title);
-        y += RPGUI.TitleH + 4f;
+        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.LabelH),
+            ProgressionFormulas.MapName(currentWorld, currentMap), RPGUI.Label);
+        y += RPGUI.LabelH;
 
-        GUI.Label(new Rect(x, y, textW, RPGUI.LabelH),
-            $"世界 {currentWorld}/{ProgressionFormulas.WorldCount}   目前區域 {currentMap}/4   強度 Lv{ContentLevel}", RPGUI.Label);
-        y += RPGUI.LabelH + 2f;
+        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.HintH),
+            $"World {currentWorld}/{ProgressionFormulas.WorldCount} · Zone {currentMap}/4 · Power Lv{ContentLevel}",
+            RPGUI.Hint);
+        y += RPGUI.HintH + 6f;
 
-        GUI.Label(new Rect(x, y, textW, RPGUI.LabelH),
-            currentMap == 4
-                ? (mapBossDefeated ? "此區 Boss：已擊敗" : "此區 Boss：尚未擊敗")
-                : "此區：一般怪 ×4（同種類）", RPGUI.Label);
-        y += RPGUI.LabelH + 2f;
+        RPGUI.DrawMapDots(new Rect(x, y, 160f, 22f), currentMap, 4, IsBossCleared(currentWorld, 4));
+        string bossText = currentMap == 4
+            ? (mapBossDefeated ? "Boss defeated" : "Boss not defeated")
+            : "Normal mobs ×4";
+        RPGUI.DrawText(new Rect(x + 170f, y - 2f, textW - 170f, RPGUI.HintH), bossText, RPGUI.Hint);
+        y += 28f;
 
-        string clears = "";
-        for (int m = 1; m <= 3; m++)
-            clears += "區" + m + " ";
-        clears += (IsBossCleared(currentWorld, 4) ? "Boss✓" : "Boss·");
-        GUI.Label(new Rect(x, y, textW, RPGUI.HintH),
-            $"區域：{clears}", RPGUI.Hint);
-        y += RPGUI.HintH + 2f;
-
-        GUI.Label(new Rect(x, y, textW, RPGUI.HintH),
-            "走路探索各區 | 1-4 瞬移 | I 背包", RPGUI.Hint);
+        RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH), "1–4 Teleport zones", RPGUI.FieldTag);
 
         if (worldPortalReady)
         {
-            Rect tip = new Rect(Screen.width * 0.5f - 380f, 24f, 760f, RPGUI.BannerH + 12f);
-            RPGUI.DrawPanel(tip, new Color(0.2f, 0.12f, 0.35f, 0.9f));
-            GUI.Label(tip, "地圖4 傳送門已開！走到發光門前往下一世界", RPGUI.Banner);
+            Rect tip = new Rect(Screen.width * 0.5f - 360f, 16f, 720f, RPGUI.BannerH);
+            RPGUI.DrawPanel(tip, new Color(0.22f, 0.12f, 0.38f, 0.94f));
+            RPGUI.DrawText(tip, "Portal open — walk to the glowing gate for the next world", RPGUI.Banner);
         }
 
         if (currentWorld == ProgressionFormulas.WorldCount && IsBossCleared(ProgressionFormulas.WorldCount, 4))
         {
-            Rect tip = new Rect(Screen.width * 0.5f - 320f, 100f, 640f, RPGUI.BannerH + 12f);
-            RPGUI.DrawPanel(tip, new Color(0.35f, 0.25f, 0.05f, 0.92f));
-            GUI.Label(tip, $"恭喜通關全部 {ProgressionFormulas.WorldCount} 個世界！", RPGUI.Banner);
+            Rect tip = new Rect(Screen.width * 0.5f - 300f, 84f, 600f, RPGUI.BannerH);
+            RPGUI.DrawPanel(tip, new Color(0.35f, 0.26f, 0.06f, 0.94f));
+            RPGUI.DrawText(tip, $"Congratulations! All {ProgressionFormulas.WorldCount} worlds cleared!", RPGUI.Banner);
         }
     }
 }

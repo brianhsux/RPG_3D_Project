@@ -164,9 +164,9 @@ public class AccountManager : MonoBehaviour
         WriteSaveFile(data, updateIndex: true);
 
         if (!silent)
-            _status = "已儲存進度";
+            _status = "Progress saved";
         if (!silent && PlayerInventory.Instance != null)
-            PlayerInventory.Instance.ShowLoot("進度已儲存");
+            PlayerInventory.Instance.ShowLoot("Progress saved");
     }
 
     void MergeMissingGear(AccountSaveData data)
@@ -280,19 +280,19 @@ public class AccountManager : MonoBehaviour
         name = (name ?? "").Trim();
         if (string.IsNullOrEmpty(name))
         {
-            _status = "請輸入帳號名稱";
+            _status = "Please enter an account name";
             return;
         }
         if (name.Length > 16)
         {
-            _status = "名稱最多 16 字";
+            _status = "Name must be 16 characters or fewer";
             return;
         }
         foreach (var a in _accounts)
         {
             if (string.Equals(a.accountName, name, StringComparison.OrdinalIgnoreCase))
             {
-                _status = "這個名稱已經存在";
+                _status = "That name already exists";
                 return;
             }
         }
@@ -324,7 +324,7 @@ public class AccountManager : MonoBehaviour
         });
         WriteIndex();
 
-        _status = $"已建立帳號：{name}";
+        _status = $"Account created: {name}";
         Time.timeScale = 1f;
 
         if (AdventureManager.Instance != null)
@@ -335,7 +335,7 @@ public class AccountManager : MonoBehaviour
     {
         if (_selectedIndex < 0 || _selectedIndex >= _accounts.Count)
         {
-            _status = "請先選擇一個帳號";
+            _status = "Please select an account first";
             return;
         }
 
@@ -343,7 +343,7 @@ public class AccountManager : MonoBehaviour
         string path = AccountPath(entry.accountId);
         if (!File.Exists(path))
         {
-            _status = "存檔遺失，無法讀取";
+            _status = "Save file missing — cannot load";
             return;
         }
 
@@ -354,13 +354,13 @@ public class AccountManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            _status = "讀取失敗：" + e.Message;
+            _status = "Load failed: " + e.Message;
             return;
         }
 
         if (data == null)
         {
-            _status = "存檔損毀";
+            _status = "Save file corrupted";
             return;
         }
 
@@ -370,7 +370,7 @@ public class AccountManager : MonoBehaviour
         IsReady = true;
         _lastGoodSave = CloneSave(data);
         _hasLastGoodSave = true;
-        _status = $"歡迎回來，{ActiveAccountName}";
+        _status = $"Welcome back, {ActiveAccountName}";
         Time.timeScale = 1f;
 
         entry.lastPlayedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
@@ -386,7 +386,7 @@ public class AccountManager : MonoBehaviour
     {
         if (_selectedIndex < 0 || _selectedIndex >= _accounts.Count)
         {
-            _status = "請先選擇要刪除的帳號";
+            _status = "Please select an account to delete";
             return;
         }
 
@@ -398,7 +398,7 @@ public class AccountManager : MonoBehaviour
         _accounts.RemoveAt(_selectedIndex);
         _selectedIndex = -1;
         WriteIndex();
-        _status = $"已刪除帳號：{entry.accountName}";
+        _status = $"Deleted account: {entry.accountName}";
     }
 
     void ResetToNewGame()
@@ -423,6 +423,7 @@ public class AccountManager : MonoBehaviour
     {
         if (IsReady)
         {
+            if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
             DrawInGameHud();
             return;
         }
@@ -430,21 +431,24 @@ public class AccountManager : MonoBehaviour
         Time.timeScale = 0f;
         RPGUI.Ensure();
 
-        float w = Mathf.Min(Screen.width - 40f, 760f);
-        float h = Mathf.Min(Screen.height - 40f, 680f);
+        RPGUI.Fill(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.02f, 0.03f, 0.05f, 0.72f));
+
+        float w = Mathf.Min(Screen.width - 40f, 720f);
+        float h = Mathf.Min(Screen.height - 40f, 640f);
         Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - h * 0.5f, w, h);
-        RPGUI.DrawPanel(panel, new Color(0.04f, 0.05f, 0.08f, 0.97f));
+        RPGUI.DrawPanel(panel, new Color(0.04f, 0.05f, 0.08f, 0.98f));
 
-        float y = panel.y + 18f;
-        GUI.Label(new Rect(panel.x + 28f, y, w - 56f, RPGUI.TitleH), "選擇帳號", RPGUI.Title);
-        y += RPGUI.TitleH + 4f;
-        GUI.Label(new Rect(panel.x + 28f, y, w - 56f, RPGUI.HintH),
-            "建立新帳號，或選擇已有帳號繼續遊玩", RPGUI.Hint);
-        y += RPGUI.HintH + 12f;
+        float y = panel.y + 16f;
+        RPGUI.DrawText(new Rect(panel.x + 24f, y, w - 48f, RPGUI.TitleH), "Select Account", RPGUI.Title);
+        y += RPGUI.TitleH;
+        RPGUI.DrawText(new Rect(panel.x + 24f, y, w - 48f, RPGUI.HintH),
+            "Create a new account or select an existing one to continue", RPGUI.Hint);
+        y += RPGUI.HintH + 10f;
 
-        if (GUI.Button(new Rect(panel.x + 28f, y, 220f, RPGUI.ButtonH), "選擇帳號", RPGUI.Button))
+        float tabW = 160f;
+        if (RPGUI.Button(new Rect(panel.x + 24f, y, tabW, RPGUI.ButtonH), "Select Account", _mode == UiMode.Select))
             _mode = UiMode.Select;
-        if (GUI.Button(new Rect(panel.x + 264f, y, 220f, RPGUI.ButtonH), "建立帳號", RPGUI.Button))
+        if (RPGUI.Button(new Rect(panel.x + 24f + tabW + 10f, y, tabW, RPGUI.ButtonH), "Create Account", _mode == UiMode.Create))
             _mode = UiMode.Create;
 
         if (_mode == UiMode.Select)
@@ -453,21 +457,21 @@ public class AccountManager : MonoBehaviour
             DrawCreateMode(panel, w, h);
 
         if (!string.IsNullOrEmpty(_status))
-            GUI.Label(new Rect(panel.x + 28f, panel.yMax - 56f, w - 56f, RPGUI.HintH), _status, RPGUI.Hint);
+            RPGUI.DrawText(new Rect(panel.x + 24f, panel.yMax - 48f, w - 48f, RPGUI.HintH), _status, RPGUI.Hint);
     }
 
     void DrawSelectMode(Rect panel, float w, float h)
     {
-        float listTop = panel.y + 18f + RPGUI.TitleH + 4f + RPGUI.HintH + 12f + RPGUI.ButtonH + 16f;
-        float listH = h - (listTop - panel.y) - 140f;
-        Rect view = new Rect(panel.x + 28f, listTop, w - 56f, Mathf.Max(140f, listH));
-        float rowH = 88f;
+        float listTop = panel.y + 16f + RPGUI.TitleH + RPGUI.HintH + 10f + RPGUI.ButtonH + 14f;
+        float listH = h - (listTop - panel.y) - 120f;
+        Rect view = new Rect(panel.x + 24f, listTop, w - 48f, Mathf.Max(120f, listH));
+        float rowH = 80f;
         float contentH = Mathf.Max(view.height, Mathf.Max(1, _accounts.Count) * rowH + 8f);
         _listScroll = GUI.BeginScrollView(view, _listScroll, new Rect(0, 0, view.width - 20f, contentH));
 
         if (_accounts.Count == 0)
         {
-            GUI.Label(new Rect(8f, 16f, view.width - 40f, RPGUI.LabelH), "尚無帳號，請先建立", RPGUI.Label);
+            RPGUI.DrawText(new Rect(8f, 16f, view.width - 40f, RPGUI.LabelH), "No accounts yet — switch to Create Account", RPGUI.Label);
         }
         else
         {
@@ -476,14 +480,16 @@ public class AccountManager : MonoBehaviour
                 var a = _accounts[i];
                 Rect row = new Rect(0f, i * rowH, view.width - 24f, rowH - 8f);
                 Color bg = i == _selectedIndex
-                    ? new Color(0.25f, 0.32f, 0.48f, 0.98f)
-                    : new Color(0.12f, 0.14f, 0.18f, 0.95f);
-                RPGUI.DrawPanel(row, bg);
+                    ? new Color(0.22f, 0.3f, 0.48f, 0.98f)
+                    : new Color(0.11f, 0.13f, 0.17f, 0.95f);
+                RPGUI.DrawPanel(row, bg, false);
+                if (i == _selectedIndex)
+                    RPGUI.Fill(new Rect(row.x, row.y, 4f, row.height), RPGUI.Accent);
 
-                GUI.Label(new Rect(row.x + 14f, row.y + 8f, row.width - 28f, RPGUI.ItemNameH),
+                RPGUI.DrawText(new Rect(row.x + 16f, row.y + 8f, row.width - 28f, RPGUI.ItemNameH),
                     a.accountName, RPGUI.ItemName);
-                GUI.Label(new Rect(row.x + 14f, row.y + 48f, row.width - 28f, RPGUI.FieldTagH),
-                    $"Lv {a.level}　世界 {a.currentWorld}　上次 {a.lastPlayedAt}", RPGUI.FieldTag);
+                RPGUI.DrawText(new Rect(row.x + 16f, row.y + 44f, row.width - 28f, RPGUI.FieldTagH),
+                    $"Lv {a.level} · World {a.currentWorld} · {a.lastPlayedAt}", RPGUI.FieldTag);
 
                 if (Event.current.type == EventType.MouseDown && row.Contains(Event.current.mousePosition))
                 {
@@ -495,44 +501,49 @@ public class AccountManager : MonoBehaviour
 
         GUI.EndScrollView();
 
-        if (GUI.Button(new Rect(panel.x + 28f, panel.yMax - 118f, 260f, RPGUI.ButtonH), "開始遊戲", RPGUI.Button))
+        if (RPGUI.Button(new Rect(panel.x + 24f, panel.yMax - 100f, 240f, RPGUI.ButtonH), "Start Game", primary: true))
             PlaySelectedAccount();
-        if (GUI.Button(new Rect(panel.x + 308f, panel.yMax - 118f, 200f, RPGUI.ButtonH), "刪除帳號", RPGUI.Button))
+        if (RPGUI.Button(new Rect(panel.x + 280f, panel.yMax - 100f, 160f, RPGUI.ButtonH), "Delete Account"))
             DeleteSelectedAccount();
     }
 
     void DrawCreateMode(Rect panel, float w, float h)
     {
-        float y = panel.y + 18f + RPGUI.TitleH + 4f + RPGUI.HintH + 12f + RPGUI.ButtonH + 24f;
-        GUI.Label(new Rect(panel.x + 28f, y, w - 56f, RPGUI.LabelH), "帳號名稱", RPGUI.Label);
-        y += RPGUI.LabelH + 8f;
+        float y = panel.y + 16f + RPGUI.TitleH + RPGUI.HintH + 10f + RPGUI.ButtonH + 20f;
+        RPGUI.DrawText(new Rect(panel.x + 24f, y, w - 48f, RPGUI.LabelH), "Account Name", RPGUI.Label);
+        y += RPGUI.LabelH + 6f;
 
         var tf = new GUIStyle(GUI.skin.textField)
         {
-            fontSize = 26,
+            fontSize = 24,
+            fontStyle = FontStyle.Bold,
             alignment = TextAnchor.MiddleLeft,
             padding = new RectOffset(12, 12, 10, 10),
-            clipping = TextClipping.Overflow
+            clipping = TextClipping.Overflow,
+            normal = { textColor = Color.white },
+            focused = { textColor = Color.white }
         };
-        _newName = GUI.TextField(new Rect(panel.x + 28f, y, w - 56f, 56f), _newName, 16, tf);
-        y += 68f;
+        _newName = GUI.TextField(new Rect(panel.x + 24f, y, w - 48f, 48f), _newName, 16, tf);
+        y += 60f;
 
-        GUI.Label(new Rect(panel.x + 28f, y, w - 56f, RPGUI.HintH),
-            "新帳號從世界 1、等級 1 開始", RPGUI.Hint);
+        RPGUI.DrawText(new Rect(panel.x + 24f, y, w - 48f, RPGUI.HintH),
+            "New accounts start at World 1, Level 1", RPGUI.Hint);
 
-        if (GUI.Button(new Rect(panel.x + 28f, panel.yMax - 118f, 300f, RPGUI.ButtonH), "建立並開始", RPGUI.Button))
+        if (RPGUI.Button(new Rect(panel.x + 24f, panel.yMax - 100f, 280f, RPGUI.ButtonH), "Create & Start", primary: true))
             CreateNewAccount(_newName);
     }
 
     void DrawInGameHud()
     {
         RPGUI.Ensure();
-        Rect box = new Rect(20f, Screen.height - 78f, 460f, 58f);
-        RPGUI.DrawPanel(box, new Color(0.05f, 0.06f, 0.09f, 0.85f));
-        GUI.Label(new Rect(box.x + 14f, box.y + 8f, 270f, RPGUI.HintH),
-            $"帳號：{ActiveAccountName}", RPGUI.Hint);
+        // Bottom-right — avoids the center control hint bar.
+        float boxW = 280f;
+        Rect box = new Rect(Screen.width - boxW - 16f, Screen.height - 52f, boxW, 40f);
+        RPGUI.DrawPanel(box, new Color(0.05f, 0.06f, 0.09f, 0.88f), false);
+        RPGUI.DrawText(new Rect(box.x + 10f, box.y + 4f, 150f, RPGUI.HintH),
+            ActiveAccountName, RPGUI.Hint);
 
-        if (GUI.Button(new Rect(box.x + 300f, box.y + 8f, 140f, 42f), "儲存", RPGUI.Button))
+        if (RPGUI.ButtonSm(new Rect(box.xMax - 96f, box.y + 4f, 86f, 32f), "Save"))
             SaveActive(silent: false);
     }
 }

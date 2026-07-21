@@ -14,6 +14,7 @@ public class ItemSaveData
 
     public bool IsValid =>
         !string.IsNullOrEmpty(displayName) &&
+        displayName != "Unknown Item" &&
         displayName != "未知裝備" &&
         itemLevel >= 1 &&
         (attack > 0.01f || defense > 0.01f || maxHpBonus > 0.01f);

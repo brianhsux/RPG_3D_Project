@@ -261,14 +261,14 @@ public static class ArmorVisualUtil
     {
         switch (style)
         {
-            case 0: return "布衣型";
-            case 1: return "皮甲型";
-            case 2: return "鎖甲型";
-            case 3: return "精鋼型";
-            case 4: return "龍鱗型";
-            case 5: return "符文型";
-            case 6: return "聖光型";
-            default: return "終焉型";
+            case 0: return "Cloth";
+            case 1: return "Leather";
+            case 2: return "Chain";
+            case 3: return "Steel";
+            case 4: return "Dragon";
+            case 5: return "Rune";
+            case 6: return "Holy";
+            default: return "Apocalypse";
         }
     }
 }

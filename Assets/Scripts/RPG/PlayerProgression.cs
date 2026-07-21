@@ -58,7 +58,7 @@ public class PlayerProgression : MonoBehaviour
         if (PlayerInventory.Instance != null)
         {
             PlayerInventory.Instance.ShowLoot(leveled
-                ? $"升級！Lv {level}   (+{amount} EXP)"
+                ? $"Level Up! Lv {level}   (+{amount} EXP)"
                 : $"+{amount} EXP");
             PlayerInventory.Instance.ApplyEquipmentStats(leveled);
         }
@@ -80,9 +80,11 @@ public class PlayerProgression : MonoBehaviour
     {
         if (!HasLevelUpMessage) return;
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady) return;
+        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
         RPGUI.Ensure();
-        Rect tip = new Rect(Screen.width * 0.5f - 320f, Screen.height * 0.28f, 640f, RPGUI.BannerH + 16f);
-        RPGUI.DrawPanel(tip, new Color(0.2f, 0.15f, 0.02f, 0.92f));
-        GUI.Label(tip, lastLevelUpMessage, RPGUI.Banner);
+        float w = Mathf.Min(Screen.width - 40f, 640f);
+        Rect tip = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.28f, w, RPGUI.BannerH);
+        RPGUI.DrawPanel(tip, new Color(0.22f, 0.16f, 0.04f, 0.94f));
+        RPGUI.DrawText(tip, lastLevelUpMessage, RPGUI.Banner);
     }
 }

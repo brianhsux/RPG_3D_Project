@@ -51,46 +51,46 @@ public static class ProgressionFormulas
 
     public static string MobDisplayName(int contentLevel, bool isBoss, EnemyKind kind)
     {
-        string prefix = isBoss ? "Boss·" : "";
+        string prefix = isBoss ? "Boss " : "";
         string name;
         switch (kind)
         {
-            case EnemyKind.Slime: name = "史萊姆"; break;
-            case EnemyKind.Goblin: name = "哥布林"; break;
-            case EnemyKind.Skeleton: name = "骷髏兵"; break;
-            case EnemyKind.Wolf: name = "野狼"; break;
-            case EnemyKind.Spider: name = "毒蛛"; break;
-            case EnemyKind.Bat: name = "血蝠"; break;
-            case EnemyKind.Mushroom: name = "蘑菇怪"; break;
-            case EnemyKind.Golem: name = "石魔像"; break;
-            case EnemyKind.Ghost: name = "遊魂"; break;
-            case EnemyKind.Imp: name = "小惡魔"; break;
-            case EnemyKind.Beetle: name = "甲蟲"; break;
-            case EnemyKind.Treant: name = "樹人"; break;
-            case EnemyKind.LavaSpawn: name = "熔岩怪"; break;
-            case EnemyKind.Crystal: name = "水晶魔"; break;
-            case EnemyKind.Wraith: name = "死靈"; break;
-            case EnemyKind.Demon: name = "惡魔"; break;
-            case EnemyKind.Yeti: name = "雪人"; break;
-            case EnemyKind.IceElemental: name = "冰元素"; break;
-            case EnemyKind.Scorpion: name = "沙蠍"; break;
-            case EnemyKind.Mummy: name = "木乃伊"; break;
-            case EnemyKind.SandWorm: name = "沙蟲"; break;
-            case EnemyKind.Toad: name = "毒蟾"; break;
-            case EnemyKind.Leech: name = "血蛭"; break;
-            case EnemyKind.Mosquito: name = "沼蚊"; break;
-            case EnemyKind.Harpy: name = "鷹身女妖"; break;
-            case EnemyKind.StormSprite: name = "風暴精靈"; break;
-            case EnemyKind.Griffon: name = "獅鷲"; break;
-            case EnemyKind.ShadowHound: name = "影犬"; break;
-            case EnemyKind.VoidEye: name = "虛空之眼"; break;
-            case EnemyKind.Tentacle: name = "深淵觸手"; break;
+            case EnemyKind.Slime: name = "Slime"; break;
+            case EnemyKind.Goblin: name = "Goblin"; break;
+            case EnemyKind.Skeleton: name = "Skeleton"; break;
+            case EnemyKind.Wolf: name = "Wolf"; break;
+            case EnemyKind.Spider: name = "Spider"; break;
+            case EnemyKind.Bat: name = "Bat"; break;
+            case EnemyKind.Mushroom: name = "Mushroom"; break;
+            case EnemyKind.Golem: name = "Golem"; break;
+            case EnemyKind.Ghost: name = "Ghost"; break;
+            case EnemyKind.Imp: name = "Imp"; break;
+            case EnemyKind.Beetle: name = "Beetle"; break;
+            case EnemyKind.Treant: name = "Treant"; break;
+            case EnemyKind.LavaSpawn: name = "Lava Spawn"; break;
+            case EnemyKind.Crystal: name = "Crystal Fiend"; break;
+            case EnemyKind.Wraith: name = "Wraith"; break;
+            case EnemyKind.Demon: name = "Demon"; break;
+            case EnemyKind.Yeti: name = "Yeti"; break;
+            case EnemyKind.IceElemental: name = "Ice Elemental"; break;
+            case EnemyKind.Scorpion: name = "Scorpion"; break;
+            case EnemyKind.Mummy: name = "Mummy"; break;
+            case EnemyKind.SandWorm: name = "Sand Worm"; break;
+            case EnemyKind.Toad: name = "Toad"; break;
+            case EnemyKind.Leech: name = "Leech"; break;
+            case EnemyKind.Mosquito: name = "Mosquito"; break;
+            case EnemyKind.Harpy: name = "Harpy"; break;
+            case EnemyKind.StormSprite: name = "Storm Sprite"; break;
+            case EnemyKind.Griffon: name = "Griffon"; break;
+            case EnemyKind.ShadowHound: name = "Shadow Hound"; break;
+            case EnemyKind.VoidEye: name = "Void Eye"; break;
+            case EnemyKind.Tentacle: name = "Abyss Tentacle"; break;
             case EnemyKind.WorldBoss:
             {
                 int w = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
-                return ProgressionFormulas.WorldThemeName(w) + "首領 Lv" + contentLevel;
+                return ProgressionFormulas.WorldThemeName(w) + " Boss Lv" + contentLevel;
             }
-            default: name = "怪物"; break;
+            default: name = "Monster"; break;
         }
         return prefix + name + " Lv" + contentLevel;
     }
@@ -167,39 +167,39 @@ public static class ProgressionFormulas
     {
         switch (world)
         {
-            case 1: return "草原世界";
-            case 2: return "森林世界";
-            case 3: return "遺跡世界";
-            case 4: return "火山世界";
-            case 5: return "終焉世界";
-            case 6: return "冰霜世界";
-            case 7: return "沙漠世界";
-            case 8: return "沼澤世界";
-            case 9: return "天空世界";
-            case 10: return "深淵世界";
-            default: return "未知世界";
+            case 1: return "Plains";
+            case 2: return "Forest";
+            case 3: return "Ruins";
+            case 4: return "Volcano";
+            case 5: return "Apocalypse";
+            case 6: return "Frost";
+            case 7: return "Desert";
+            case 8: return "Swamp";
+            case 9: return "Sky";
+            case 10: return "Abyss";
+            default: return "Unknown World";
         }
     }
 
     public static string MapName(int world, int map)
     {
         map = Mathf.Clamp(map, 1, MapsPerWorld);
-        if (map == 4) return WorldThemeName(world) + " · 首領殿堂";
+        if (map == 4) return WorldThemeName(world) + " · Boss Sanctum";
 
         string zone;
         switch (world)
         {
-            case 1: zone = map == 1 ? "牧草地" : map == 2 ? "丘陵" : "蟲巢"; break;
-            case 2: zone = map == 1 ? "樹屋村" : map == 2 ? "密林" : "蛛網谷"; break;
-            case 3: zone = map == 1 ? "廢墟門廊" : map == 2 ? "墓園" : "死靈迴廊"; break;
-            case 4: zone = map == 1 ? "熔岩村" : map == 2 ? "火口" : "岩魔窟"; break;
-            case 5: zone = map == 1 ? "扭曲平原" : map == 2 ? "晶核林" : "魔樹海"; break;
-            case 6: zone = map == 1 ? "雪原營地" : map == 2 ? "凍湖" : "冰晶洞"; break;
-            case 7: zone = map == 1 ? "綠洲" : map == 2 ? "沙丘" : "蝎穴"; break;
-            case 8: zone = map == 1 ? "泥屋" : map == 2 ? "毒沼" : "腐根林"; break;
-            case 9: zone = map == 1 ? "浮島村" : map == 2 ? "雲橋" : "風暴巢"; break;
-            case 10: zone = map == 1 ? "深淵碼頭" : map == 2 ? "虛空裂縫" : "魔王前廳"; break;
-            default: zone = "地圖 " + map; break;
+            case 1: zone = map == 1 ? "Meadow" : map == 2 ? "Hills" : "Bug Nest"; break;
+            case 2: zone = map == 1 ? "Treehouse Village" : map == 2 ? "Deep Woods" : "Web Valley"; break;
+            case 3: zone = map == 1 ? "Ruined Hall" : map == 2 ? "Graveyard" : "Wraith Corridor"; break;
+            case 4: zone = map == 1 ? "Lava Village" : map == 2 ? "Crater" : "Rock Golem Den"; break;
+            case 5: zone = map == 1 ? "Twisted Plains" : map == 2 ? "Crystal Grove" : "Demon Tree Sea"; break;
+            case 6: zone = map == 1 ? "Snow Camp" : map == 2 ? "Frozen Lake" : "Ice Crystal Cave"; break;
+            case 7: zone = map == 1 ? "Oasis" : map == 2 ? "Dunes" : "Scorpion Den"; break;
+            case 8: zone = map == 1 ? "Mud Huts" : map == 2 ? "Poison Swamp" : "Rotroot Forest"; break;
+            case 9: zone = map == 1 ? "Sky Village" : map == 2 ? "Cloud Bridge" : "Storm Nest"; break;
+            case 10: zone = map == 1 ? "Abyss Dock" : map == 2 ? "Void Rift" : "Demon Lord Antechamber"; break;
+            default: zone = "Map " + map; break;
         }
         return WorldThemeName(world) + " · " + zone;
     }

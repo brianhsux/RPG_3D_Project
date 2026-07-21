@@ -202,6 +202,7 @@ public class EnemyAI : MonoBehaviour
     void OnGUI()
     {
         if (_stats == null || _stats.isDead || Camera.main == null) return;
+        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
 
         Vector3 world = transform.position + Vector3.up * (_stats.isBoss ? 4.2f : 2.8f);
         Vector3 screen = Camera.main.WorldToScreenPoint(world);
@@ -214,8 +215,8 @@ public class EnemyAI : MonoBehaviour
         float x = screen.x - barW * 0.5f;
         float y = Screen.height - screen.y - 20f;
 
-        GUI.Label(new Rect(x - 20f, y - RPGUI.LabelH - 4f, barW + 80f, RPGUI.LabelH),
-            _stats.displayName, RPGUI.Label);
+        RPGUI.DrawText(new Rect(x - 10f, y - RPGUI.HintH - 2f, barW + 40f, RPGUI.HintH),
+            _stats.displayName, RPGUI.Hint);
         RPGUI.DrawBar(
             new Rect(x, y, barW, barH),
             _stats.HealthPercent,

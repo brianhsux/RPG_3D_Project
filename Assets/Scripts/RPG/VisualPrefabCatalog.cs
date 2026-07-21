@@ -61,13 +61,13 @@ public class VisualPrefabCatalog : ScriptableObject
     [Header("Enemies — leave Kind empty slots unused")]
     public EnemyPrefabEntry[] enemies;
 
-    [Header("Weapons by style 0–7 (木/鐵/細刃/骨/焰/霜/雷/虛空)")]
+    [Header("Weapons by style 0–7 (Wood/Iron/Thin Blade/Bone/Flame/Frost/Thunder/Void)")]
     public GameObject[] weaponStylePrefabs = new GameObject[8];
     public Vector3 weaponLocalPosition = Vector3.zero;
     public Vector3 weaponLocalEuler = Vector3.zero;
     public float weaponPrefabScale = 1f;
 
-    [Header("Player armor body by style 0–7 (布衣…終焉)")]
+    [Header("Player armor body by style 0–7 (Cloth…Apocalypse)")]
     [Tooltip("Full-body mesh replacing Body+Head when set.")]
     public GameObject[] armorStylePrefabs = new GameObject[8];
     public GameObject defaultPlayerBodyPrefab;

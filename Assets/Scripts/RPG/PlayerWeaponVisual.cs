@@ -336,14 +336,14 @@ public static class WeaponVisualUtil
     {
         switch (style)
         {
-            case 0: return "木劍型";
-            case 1: return "鐵劍型";
-            case 2: return "細刃型";
-            case 3: return "骨刃型";
-            case 4: return "焰斬型";
-            case 5: return "霜刃型";
-            case 6: return "雷劍型";
-            default: return "虛空型";
+            case 0: return "Wood";
+            case 1: return "Iron";
+            case 2: return "Thin Blade";
+            case 3: return "Bone";
+            case 4: return "Flame";
+            case 5: return "Frost";
+            case 6: return "Thunder";
+            default: return "Void";
         }
     }
 }

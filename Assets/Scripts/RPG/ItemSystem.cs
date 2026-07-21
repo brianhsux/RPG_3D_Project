@@ -58,23 +58,23 @@ public static class ItemFactory
 {
     static readonly string[] WeaponNames =
     {
-        "木劍", "鐵劍", "疾風刃", "骨刃", "炎斬", "霜刃", "雷鳴劍", "虛空之刃"
+        "Wood Sword", "Iron Sword", "Wind Blade", "Bone Blade", "Flame Slash", "Frost Blade", "Thunder Sword", "Void Blade"
     };
 
     static readonly string[] ArmorNames =
     {
-        "布衣", "皮甲", "鎖子甲", "精鋼鎧", "龍鱗甲", "符文鎧", "聖光鎧", "終焉鎧"
+        "Cloth", "Leather", "Chainmail", "Steel Plate", "Dragon Scale", "Rune Plate", "Holy Plate", "Apocalypse Plate"
     };
 
     public static string RarityName(ItemRarity rarity)
     {
         switch (rarity)
         {
-            case ItemRarity.Uncommon: return "優秀";
-            case ItemRarity.Rare: return "稀有";
-            case ItemRarity.Epic: return "史詩";
-            case ItemRarity.Legendary: return "傳說";
-            default: return "普通";
+            case ItemRarity.Uncommon: return "Uncommon";
+            case ItemRarity.Rare: return "Rare";
+            case ItemRarity.Epic: return "Epic";
+            case ItemRarity.Legendary: return "Legendary";
+            default: return "Common";
         }
     }
 

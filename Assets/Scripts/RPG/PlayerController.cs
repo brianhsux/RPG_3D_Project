@@ -236,74 +236,76 @@ public class PlayerController : MonoBehaviour
     void OnGUI()
     {
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady) return;
+        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
 
         RPGUI.Ensure();
 
-        float panelW = 560f;
-        float panelH = 360f;
-        Rect panel = new Rect(20f, 20f, panelW, panelH);
-        RPGUI.DrawPanel(panel, new Color(0.05f, 0.08f, 0.12f, 0.9f));
+        float panelW = 400f;
+        float panelH = 198f;
+        Rect panel = new Rect(16f, 16f, panelW, panelH);
+        RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
         var prog = PlayerProgression.Instance;
-        string lvText = prog != null ? $"英雄  Lv {prog.level}" : "英雄 HP";
-        GUI.Label(new Rect(36f, 28f, 500f, RPGUI.TitleH), lvText, RPGUI.Title);
+        string lvText = prog != null ? $"Hero  Lv {prog.level}" : "Hero";
+        RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 10f, 220f, RPGUI.LabelH), lvText, RPGUI.Label);
+
+        RPGUI.DrawText(new Rect(panel.x + 220f, panel.y + 14f, 166f, RPGUI.HintH),
+            $"ATK {_stats.attackDamage:0}  DEF {_stats.defense:0}", RPGUI.Hint);
 
         RPGUI.DrawBar(
-            new Rect(36f, 90f, 520f, 44f),
+            new Rect(panel.x + 14f, panel.y + 52f, panelW - 28f, 28f),
             _stats.HealthPercent,
-            Color.Lerp(new Color(0.85f, 0.15f, 0.15f), new Color(0.2f, 0.85f, 0.3f), _stats.HealthPercent),
+            Color.Lerp(new Color(0.85f, 0.18f, 0.18f), new Color(0.22f, 0.82f, 0.35f), _stats.HealthPercent),
             $"HP  {Mathf.CeilToInt(_stats.currentHealth)} / {Mathf.CeilToInt(_stats.maxHealth)}"
         );
 
         if (prog != null)
         {
             RPGUI.DrawBar(
-                new Rect(36f, 144f, 520f, 40f),
+                new Rect(panel.x + 14f, panel.y + 86f, panelW - 28f, 24f),
                 prog.XpPercent,
                 new Color(0.3f, 0.55f, 1f),
                 $"EXP  {prog.xp} / {prog.xpToNext}"
             );
         }
 
-        GUI.Label(new Rect(36f, 196f, 520f, RPGUI.HintH),
-            $"攻擊 {_stats.attackDamage:0}    防禦 {_stats.defense:0}    按 I 開背包", RPGUI.Hint);
-
         var inv = PlayerInventory.Instance;
         if (inv != null)
         {
-            DrawHudEquip(36f, 244f, 250f, "武器", inv.equippedWeapon);
-            DrawHudEquip(306f, 244f, 250f, "防具", inv.equippedArmor);
+            DrawHudEquip(panel.x + 14f, panel.y + 120f, 180f, "WPN", inv.equippedWeapon);
+            DrawHudEquip(panel.x + 206f, panel.y + 120f, 180f, "ARM", inv.equippedArmor);
         }
 
-        GUI.Label(new Rect(20f, 400f, 980f, RPGUI.HintH),
-            "WASD 移動｜空白鍵跳躍｜靠近自動攻擊｜1-4 瞬移｜I 背包", RPGUI.Hint);
+        RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 520f, RPGUI.HintH),
+            "WASD Move · Space Jump · Attack in range · 1-4 Teleport · I Inventory", RPGUI.Hint);
 
         if (_stats.isDead)
         {
-            Rect banner = new Rect(Screen.width * 0.5f - 340f, Screen.height * 0.5f - 50f, 680f, RPGUI.BannerH + 20f);
-            RPGUI.DrawPanel(banner, new Color(0.45f, 0.05f, 0.05f, 0.92f));
-            GUI.Label(banner, "你倒下了！按 R 重生", RPGUI.Banner);
+            Rect banner = new Rect(Screen.width * 0.5f - 300f, Screen.height * 0.5f - 40f, 600f, RPGUI.BannerH);
+            RPGUI.DrawPanel(banner, new Color(0.42f, 0.06f, 0.06f, 0.94f));
+            RPGUI.DrawText(banner, "You fell! Press R to respawn", RPGUI.Banner);
         }
     }
 
     static void DrawHudEquip(float x, float y, float width, string slotTitle, ItemInstance item)
     {
-        Rect box = new Rect(x, y, width, 100f);
-        RPGUI.DrawPanel(box, new Color(0.1f, 0.12f, 0.18f, 0.95f));
+        Rect box = new Rect(x, y, width, 64f);
+        RPGUI.DrawPanel(box, RPGUI.PanelBgSoft, false);
 
         if (item == null)
         {
-            GUI.Label(new Rect(x + 12f, y + 12f, width - 24f, RPGUI.FieldTagH), slotTitle, RPGUI.FieldTag);
-            GUI.Label(new Rect(x + 12f, y + 50f, width - 24f, RPGUI.HintH), "（空）", RPGUI.Hint);
+            RPGUI.DrawText(new Rect(x + 10f, y + 16f, width - 20f, RPGUI.HintH), $"{slotTitle} (empty)", RPGUI.Hint);
             return;
         }
 
-        RPGUI.DrawItemIcon(new Rect(x + 10f, y + 16f, 68f, 68f), item);
-
-        GUI.Label(new Rect(x + 90f, y + 8f, width - 102f, RPGUI.FieldTagH), slotTitle, RPGUI.FieldTag);
+        RPGUI.Fill(new Rect(x, y, 3f, 64f), item.RarityColor);
+        RPGUI.DrawItemIcon(new Rect(x + 8f, y + 8f, 48f, 48f), item);
         GUI.color = item.RarityColor;
-        GUI.Label(new Rect(x + 90f, y + 40f, width - 102f, RPGUI.HintH), item.displayName, RPGUI.Hint);
+        RPGUI.DrawText(new Rect(x + 64f, y + 6f, width - 72f, RPGUI.HintH), item.displayName, RPGUI.Hint);
         GUI.color = Color.white;
-        GUI.Label(new Rect(x + 90f, y + 72f, width - 102f, RPGUI.FieldTagH), $"Lv {item.itemLevel}", RPGUI.FieldTag);
+        string stat = item.slot == ItemSlot.Weapon
+            ? $"Lv{item.itemLevel}  ATK {item.attack:0}"
+            : $"Lv{item.itemLevel}  DEF {item.defense:0}";
+        RPGUI.DrawText(new Rect(x + 64f, y + 34f, width - 72f, RPGUI.FieldTagH), stat, RPGUI.FieldTag);
     }
 }

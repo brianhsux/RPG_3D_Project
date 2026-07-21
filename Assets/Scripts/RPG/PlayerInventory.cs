@@ -98,11 +98,11 @@ public class PlayerInventory : MonoBehaviour
         if (item == null) return false;
         if (bag.Count >= MaxBag)
         {
-            ShowLoot("背包已滿！");
+            ShowLoot("Bag full!");
             return false;
         }
         bag.Add(item);
-        ShowLoot($"獲得 {item.displayName} Lv{item.itemLevel}");
+        ShowLoot($"Obtained {item.displayName} Lv{item.itemLevel}");
         if (AccountManager.Instance != null && AccountManager.Instance.IsReady)
             AccountManager.Instance.SaveActive(silent: true);
         return true;
@@ -134,9 +134,128 @@ public class PlayerInventory : MonoBehaviour
         }
 
         ApplyEquipmentStats(false);
-        ShowLoot($"裝備了 {item.displayName}");
+        ShowLoot($"Equipped {item.displayName}");
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
+    }
+
+    /// <summary>
+    /// Equip the strongest weapon and armor from bag + currently equipped.
+    /// Weapon ranked by attack; armor by defense + HP bonus.
+    /// </summary>
+    public int EquipBest()
+    {
+        int changed = 0;
+        string weaponMsg = null;
+        string armorMsg = null;
+
+        int bestWeaponIdx = FindBestBagIndex(ItemSlot.Weapon, equippedWeapon);
+        if (bestWeaponIdx >= 0)
+        {
+            var item = bag[bestWeaponIdx];
+            bag.RemoveAt(bestWeaponIdx);
+            if (equippedWeapon != null) bag.Add(equippedWeapon);
+            equippedWeapon = item;
+            weaponMsg = item.displayName;
+            changed++;
+        }
+
+        int bestArmorIdx = FindBestBagIndex(ItemSlot.Armor, equippedArmor);
+        if (bestArmorIdx >= 0)
+        {
+            var item = bag[bestArmorIdx];
+            bag.RemoveAt(bestArmorIdx);
+            if (equippedArmor != null) bag.Add(equippedArmor);
+            equippedArmor = item;
+            armorMsg = item.displayName;
+            changed++;
+        }
+
+        if (changed > 0)
+        {
+            ApplyEquipmentStats(false);
+            if (weaponMsg != null && armorMsg != null)
+                ShowLoot($"Equip Best: Weapon {weaponMsg}, Armor {armorMsg}");
+            else if (weaponMsg != null)
+                ShowLoot($"Equip Best: Weapon {weaponMsg}");
+            else
+                ShowLoot($"Equip Best: Armor {armorMsg}");
+            if (AccountManager.Instance != null)
+                AccountManager.Instance.SaveActive(silent: true);
+        }
+        else
+            ShowLoot("Already wearing best gear");
+
+        return changed;
+    }
+
+    /// <summary>Bag index of an item better than <paramref name="current"/>, or -1.</summary>
+    int FindBestBagIndex(ItemSlot slot, ItemInstance current)
+    {
+        int bestIdx = -1;
+        ItemInstance best = current;
+        for (int i = 0; i < bag.Count; i++)
+        {
+            var item = bag[i];
+            if (item == null || item.slot != slot) continue;
+            if (!IsBetterGear(item, best)) continue;
+            best = item;
+            bestIdx = i;
+        }
+        return bestIdx;
+    }
+
+    public static bool IsBetterGear(ItemInstance candidate, ItemInstance current)
+    {
+        if (candidate == null) return false;
+        if (current == null) return true;
+
+        float a = GearScore(candidate);
+        float b = GearScore(current);
+        if (a > b + 0.01f) return true;
+        if (a < b - 0.01f) return false;
+        if (candidate.rarity != current.rarity)
+            return candidate.rarity > current.rarity;
+        return candidate.itemLevel > current.itemLevel;
+    }
+
+    public static float GearScore(ItemInstance item)
+    {
+        if (item == null) return float.NegativeInfinity;
+        if (item.slot == ItemSlot.Weapon)
+            return item.attack;
+        return item.defense * 2.5f + item.maxHpBonus * 0.12f;
+    }
+
+    public string CompareLabel(ItemInstance item)
+    {
+        if (item == null) return "";
+        var equipped = item.slot == ItemSlot.Weapon ? equippedWeapon : equippedArmor;
+        if (equipped == null) return "Equip";
+        if (IsBetterGear(item, equipped))
+        {
+            if (item.slot == ItemSlot.Weapon)
+            {
+                float d = item.attack - equipped.attack;
+                return d > 0.5f ? $"+{d:0} ATK" : "Better";
+            }
+            float def = item.defense - equipped.defense;
+            float hp = item.maxHpBonus - equipped.maxHpBonus;
+            if (def > 0.5f && hp > 0.5f) return "Better";
+            if (def > 0.5f) return $"+{def:0} DEF";
+            if (hp > 0.5f) return $"+{hp:0} HP";
+            return "Better";
+        }
+        if (Mathf.Abs(GearScore(item) - GearScore(equipped)) < 0.5f)
+            return "Similar";
+        return "Weaker";
+    }
+
+    public void SetPanelOpen(bool open)
+    {
+        if (showPanel == open) return;
+        showPanel = open;
+        Time.timeScale = open ? 0f : 1f;
     }
 
     /// <summary>
@@ -165,12 +284,12 @@ public class PlayerInventory : MonoBehaviour
 
         if (crafted > 0)
         {
-            ShowLoot($"一鍵合成完成：共 {crafted} 次");
+            ShowLoot($"Auto Craft complete: {crafted} crafts");
             if (AccountManager.Instance != null)
                 AccountManager.Instance.SaveActive(silent: true);
         }
         else
-            ShowLoot("沒有可合成的裝備（需同類型 ×3）");
+            ShowLoot("Nothing to craft (need 3 of same type)");
 
         return crafted;
     }
@@ -241,8 +360,13 @@ public class PlayerInventory : MonoBehaviour
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady) return;
 
         var kb = Keyboard.current;
-        if (kb != null && kb.iKey.wasPressedThisFrame)
-            showPanel = !showPanel;
+        if (kb == null) return;
+
+        if (kb.iKey.wasPressedThisFrame)
+            SetPanelOpen(!showPanel);
+
+        if (showPanel && kb.escapeKey.wasPressedThisFrame)
+            SetPanelOpen(false);
     }
 
     void OnGUI()
@@ -252,76 +376,104 @@ public class PlayerInventory : MonoBehaviour
         RPGUI.Ensure();
 
         if (HasLootMessage)
-        {
-            Rect tip = new Rect(Screen.width * 0.5f - 400f, Screen.height - 140f, 800f, RPGUI.BannerH + 16f);
-            RPGUI.DrawPanel(tip, new Color(0.1f, 0.15f, 0.08f, 0.9f));
-            GUI.Label(tip, lastLootMessage, RPGUI.Banner);
-        }
+            RPGUI.DrawToast(lastLootMessage, new Color(0.1f, 0.16f, 0.1f, 0.94f));
 
         if (!showPanel) return;
 
-        float w = MathMin(Screen.width - 40f, 1040f);
-        float h = Mathf.Min(Screen.height - 40f, 820f);
-        Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, 24f, w, h);
-        RPGUI.DrawPanel(panel, new Color(0.05f, 0.06f, 0.09f, 0.96f));
+        int prevDepth = GUI.depth;
+        GUI.depth = -1000;
 
-        float y = panel.y + 14f;
-        GUI.Label(new Rect(panel.x + 28f, y, w - 56f, RPGUI.TitleH),
-            "背包 / 裝備 / 合成　（按 I 關閉）", RPGUI.Title);
-        y += RPGUI.TitleH + 6f;
+        Rect dim = new Rect(0f, 0f, Screen.width, Screen.height);
+        RPGUI.Fill(dim, new Color(0f, 0f, 0f, 0.58f));
 
-        GUI.Label(new Rect(panel.x + 28f, y, 400f, RPGUI.LabelH), "目前裝備", RPGUI.Label);
-        y += RPGUI.LabelH + 4f;
+        float w = MathMin(Screen.width - 32f, 980f);
+        float h = Mathf.Min(Screen.height - 32f, 760f);
+        Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - h * 0.5f, w, h);
 
-        float cardW = (w - 72f) * 0.5f;
-        float cardH = 160f;
-        DrawEquippedCard(panel.x + 28f, y, cardW, cardH, "武器", equippedWeapon);
-        DrawEquippedCard(panel.x + 44f + cardW, y, cardW, cardH, "防具", equippedArmor);
-        y += cardH + 12f;
-
-        var prog = PlayerProgression.Instance;
-        if (prog != null)
+        // Click outside panel closes inventory.
+        if (Event.current.type == EventType.MouseDown &&
+            Event.current.button == 0 &&
+            !panel.Contains(Event.current.mousePosition))
         {
-            GUI.Label(new Rect(panel.x + 28f, y, 300f, RPGUI.LabelH),
-                $"角色等級  Lv {prog.level}", RPGUI.Label);
-            RPGUI.DrawBar(
-                new Rect(panel.x + 320f, y + 4f, w - 360f, 40f),
-                prog.XpPercent,
-                new Color(0.35f, 0.55f, 1f),
-                $"EXP {prog.xp} / {prog.xpToNext}"
-            );
-            y += RPGUI.LabelH + 8f;
+            SetPanelOpen(false);
+            Event.current.Use();
+            GUI.depth = prevDepth;
+            return;
         }
 
-        int craftable = CountCraftableBatches();
-        GUI.Label(new Rect(panel.x + 28f, y, w - 56f, RPGUI.HintH),
-            $"背包 {bag.Count}/{MaxBag}　｜　左鍵裝備　｜　可合成約 {craftable} 次　｜　可捲動", RPGUI.Hint);
+        RPGUI.DrawPanel(panel, new Color(0.045f, 0.055f, 0.08f, 0.98f));
+
+        float pad = 24f;
+        float y = panel.y + 16f;
+
+        RPGUI.DrawText(new Rect(panel.x + pad, y, w - 160f, RPGUI.TitleH), "Inventory", RPGUI.Title);
+        if (RPGUI.ButtonSm(new Rect(panel.xMax - pad - 100f, y + 4f, 100f, RPGUI.ButtonSmH), "Close"))
+            SetPanelOpen(false);
+        y += RPGUI.TitleH + 2f;
+
+        RPGUI.DrawText(new Rect(panel.x + pad, y, w - pad * 2f, RPGUI.HintH),
+            "I / Esc Close  |  Green = better than equipped", RPGUI.Hint);
         y += RPGUI.HintH + 8f;
 
+        RPGUI.DrawText(new Rect(panel.x + pad, y, 200f, RPGUI.LabelH), "Equipped", RPGUI.Label);
+        y += RPGUI.LabelH;
+
+        float cardW = (w - pad * 2f - 12f) * 0.5f;
+        float cardH = 128f;
+        DrawEquippedCard(panel.x + pad, y, cardW, cardH, "Weapon", equippedWeapon);
+        DrawEquippedCard(panel.x + pad + cardW + 12f, y, cardW, cardH, "Armor", equippedArmor);
+        y += cardH + 12f;
+
+        int craftable = CountCraftableBatches();
+        int upgradeCount = CountUpgradesInBag();
+        string bagHint = upgradeCount > 0
+            ? $"Bag {bag.Count}/{MaxBag}  |  {upgradeCount} upgrade(s) available"
+            : $"Bag {bag.Count}/{MaxBag}  |  No better gear";
+        RPGUI.DrawText(new Rect(panel.x + pad, y, w - pad * 2f, RPGUI.HintH), bagHint, RPGUI.Hint);
+        y += RPGUI.HintH + 6f;
+
         float listTop = y;
-        float listBottom = panel.yMax - 88f;
+        float listBottom = panel.yMax - 78f;
         float viewH = Mathf.Max(80f, listBottom - listTop);
-        float rowH = 104f;
-        float contentW = w - 76f;
+        float rowH = 96f;
+        float contentW = w - pad * 2f - 20f;
         float contentH = Mathf.Max(viewH, bag.Count * rowH + 8f);
 
-        Rect viewRect = new Rect(panel.x + 28f, listTop, w - 56f, viewH);
-        Rect contentRect = new Rect(0f, 0f, contentW, contentH);
-        _bagScroll = GUI.BeginScrollView(viewRect, _bagScroll, contentRect, false, true);
+        Rect viewRect = new Rect(panel.x + pad, listTop, w - pad * 2f, viewH);
+        _bagScroll = GUI.BeginScrollView(viewRect, _bagScroll, new Rect(0f, 0f, contentW, contentH), false, true);
 
         for (int i = 0; i < bag.Count; i++)
-            DrawItemLine(0f, i * rowH, contentW - 4f, bag[i], i, false);
+            DrawItemLine(0f, i * rowH, contentW - 4f, bag[i], i);
 
         if (bag.Count == 0)
-            GUI.Label(new Rect(8f, 12f, contentW - 16f, RPGUI.HintH), "背包是空的", RPGUI.Hint);
+            RPGUI.DrawText(new Rect(8f, 16f, contentW - 16f, RPGUI.HintH), "Bag is empty — defeat monsters for loot", RPGUI.Hint);
 
         GUI.EndScrollView();
 
-        string craftLabel = craftable > 0
-            ? $"一鍵合成（約 {craftable} 次）"
-            : "一鍵合成（無可合成）";
-        if (GUI.Button(new Rect(panel.x + 28f, panel.yMax - 74f, 440f, RPGUI.ButtonH), craftLabel, RPGUI.Button))
+        float btnY = panel.yMax - 66f;
+        float btnGap = 12f;
+        float btnW = (w - pad * 2f - btnGap) * 0.5f;
+        if (RPGUI.Button(new Rect(panel.x + pad, btnY, btnW, RPGUI.ButtonH), "Equip Best", primary: true))
+            EquipBest();
+
+        string craftLabel = craftable > 0 ? $"Auto Craft ({craftable})" : "Auto Craft";
+        if (RPGUI.Button(new Rect(panel.x + pad + btnW + btnGap, btnY, btnW, RPGUI.ButtonH), craftLabel))
             AutoSynthesizeAll();
+
+        GUI.depth = prevDepth;
+    }
+
+    int CountUpgradesInBag()
+    {
+        int n = 0;
+        for (int i = 0; i < bag.Count; i++)
+        {
+            var item = bag[i];
+            if (item == null) continue;
+            var eq = item.slot == ItemSlot.Weapon ? equippedWeapon : equippedArmor;
+            if (IsBetterGear(item, eq)) n++;
+        }
+        return n;
     }
 
     int CountCraftableBatches()
@@ -356,86 +508,83 @@ public class PlayerInventory : MonoBehaviour
     void DrawEquippedCard(float x, float y, float width, float height, string slotTitle, ItemInstance item)
     {
         Rect r = new Rect(x, y, width, height);
-        RPGUI.DrawPanel(r, new Color(0.14f, 0.16f, 0.22f, 0.98f));
+        RPGUI.DrawPanel(r, new Color(0.12f, 0.14f, 0.2f, 0.98f), false);
+        if (item != null)
+            RPGUI.Fill(new Rect(x, y, 4f, height), item.RarityColor);
 
-        Color prev = GUI.color;
-        GUI.color = new Color(0.22f, 0.28f, 0.4f, 1f);
-        GUI.DrawTexture(new Rect(x, y, width, RPGUI.LabelH), Texture2D.whiteTexture);
-        GUI.color = prev;
-        GUI.Label(new Rect(x + 14f, y, width - 28f, RPGUI.LabelH), slotTitle, RPGUI.Label);
+        RPGUI.DrawText(new Rect(x + 14f, y + 8f, width - 28f, RPGUI.FieldTagH), slotTitle, RPGUI.FieldTag);
 
         if (item == null)
         {
-            GUI.Label(new Rect(x + 14f, y + RPGUI.LabelH + 16f, width - 28f, RPGUI.HintH),
-                "（尚未裝備）", RPGUI.Hint);
+            RPGUI.DrawText(new Rect(x + 14f, y + 48f, width - 28f, RPGUI.HintH), "(not equipped)", RPGUI.Hint);
             return;
         }
 
-        float bodyY = y + RPGUI.LabelH + 10f;
-        Rect iconRect = new Rect(x + 14f, bodyY, 78f, 78f);
-        RPGUI.DrawItemIcon(iconRect, item);
+        float bodyY = y + 36f;
+        RPGUI.DrawItemIcon(new Rect(x + 14f, bodyY, 68f, 68f), item);
 
-        float textX = x + 106f;
-        float textW = width - 120f;
+        float textX = x + 96f;
+        float textW = width - 110f;
 
-        GUI.Label(new Rect(textX, bodyY, 70f, RPGUI.FieldTagH), "名稱", RPGUI.FieldTag);
         GUI.color = item.RarityColor;
-        GUI.Label(new Rect(textX + 70f, bodyY, textW - 70f, RPGUI.ItemNameH), item.displayName, RPGUI.ItemName);
+        RPGUI.DrawText(new Rect(textX, bodyY, textW, RPGUI.ItemNameH), item.displayName, RPGUI.ItemName);
         GUI.color = Color.white;
 
-        float row2 = bodyY + RPGUI.ItemNameH + 2f;
-        GUI.Label(new Rect(textX, row2, 70f, RPGUI.FieldTagH), "等級", RPGUI.FieldTag);
         string styleTag = item.slot == ItemSlot.Weapon
             ? WeaponVisualUtil.StyleLabel(WeaponVisualUtil.StyleIndex(item.itemLevel))
             : ArmorVisualUtil.StyleLabel(ArmorVisualUtil.StyleIndex(item.itemLevel));
         string stats = item.slot == ItemSlot.Weapon
-            ? $"Lv {item.itemLevel}　{styleTag}　攻擊 {item.attack:0}"
-            : $"Lv {item.itemLevel}　{styleTag}　防禦 {item.defense:0}　生命 +{item.maxHpBonus:0}";
-        GUI.Label(new Rect(textX + 70f, row2, textW - 70f, RPGUI.ItemMetaH), stats, RPGUI.ItemMeta);
+            ? $"Lv {item.itemLevel} · {styleTag} · ATK {item.attack:0}"
+            : $"Lv {item.itemLevel} · {styleTag} · DEF {item.defense:0} · HP +{item.maxHpBonus:0}";
+        RPGUI.DrawText(new Rect(textX, bodyY + 42f, textW, RPGUI.ItemMetaH), stats, RPGUI.ItemMeta);
     }
 
-    void DrawItemLine(float x, float y, float width, ItemInstance item, int bagIndex, bool equipped)
+    void DrawItemLine(float x, float y, float width, ItemInstance item, int bagIndex)
     {
-        float rowH = 98f;
+        float rowH = 90f;
         if (item == null)
         {
-            RPGUI.DrawPanel(new Rect(x, y, width, rowH), new Color(0.1f, 0.1f, 0.12f, 0.85f));
-            GUI.Label(new Rect(x + 16f, y, width - 32f, rowH), "（空欄位）", RPGUI.Hint);
+            RPGUI.DrawPanel(new Rect(x, y, width, rowH), new Color(0.1f, 0.1f, 0.12f, 0.85f), false);
+            RPGUI.DrawText(new Rect(x + 16f, y, width - 32f, rowH), "(empty slot)", RPGUI.Hint);
             return;
         }
 
-        Rect r = new Rect(x, y, width, rowH);
-        RPGUI.DrawPanel(r, new Color(0.12f, 0.12f, 0.16f, 0.94f));
+        var equipped = item.slot == ItemSlot.Weapon ? equippedWeapon : equippedArmor;
+        bool better = IsBetterGear(item, equipped);
+        bool worse = equipped != null && !better && GearScore(item) < GearScore(equipped) - 0.5f;
 
-        Rect iconRect = new Rect(x + 10f, y + 14f, 70f, 70f);
-        RPGUI.DrawItemIcon(iconRect, item);
+        Rect r = new Rect(x, y, width, rowH);
+        Color bg = better
+            ? new Color(0.1f, 0.18f, 0.14f, 0.96f)
+            : new Color(0.11f, 0.12f, 0.16f, 0.94f);
+        RPGUI.DrawPanel(r, bg, false);
+        RPGUI.Fill(new Rect(x, y, 4f, rowH), item.RarityColor);
+
+        RPGUI.DrawItemIcon(new Rect(x + 14f, y + 12f, 66f, 66f), item);
 
         string styleTag = item.slot == ItemSlot.Weapon
             ? WeaponVisualUtil.StyleLabel(WeaponVisualUtil.StyleIndex(item.itemLevel))
             : ArmorVisualUtil.StyleLabel(ArmorVisualUtil.StyleIndex(item.itemLevel));
         string stats = item.slot == ItemSlot.Weapon
-            ? $"攻擊 {item.attack:0}"
-            : $"防禦 {item.defense:0}　生命 +{item.maxHpBonus:0}";
-        string equippedTag = equipped ? "　[已裝備]" : "";
+            ? $"ATK {item.attack:0}"
+            : $"DEF {item.defense:0} · HP +{item.maxHpBonus:0}";
 
         float textX = x + 94f;
-        float textW = width - 108f;
+        float textW = width - 230f;
 
-        GUI.Label(new Rect(textX, y + 8f, 70f, RPGUI.FieldTagH), "名稱", RPGUI.FieldTag);
         GUI.color = item.RarityColor;
-        GUI.Label(new Rect(textX + 70f, y + 6f, textW - 70f, RPGUI.ItemNameH),
-            $"{item.displayName}{equippedTag}", RPGUI.ItemName);
+        RPGUI.DrawText(new Rect(textX, y + 10f, textW, RPGUI.ItemNameH), item.displayName, RPGUI.ItemName);
         GUI.color = Color.white;
 
-        GUI.Label(new Rect(textX, y + 54f, 70f, RPGUI.FieldTagH), "等級", RPGUI.FieldTag);
-        GUI.Label(new Rect(textX + 70f, y + 52f, textW - 70f, RPGUI.ItemMetaH),
-            $"Lv {item.itemLevel}　｜　{styleTag}　｜　{stats}", RPGUI.ItemMeta);
+        RPGUI.DrawText(new Rect(textX, y + 50f, textW, RPGUI.ItemMetaH),
+            $"Lv {item.itemLevel} · {styleTag} · {stats}", RPGUI.ItemMeta);
 
-        if (bagIndex >= 0 && Event.current.type == EventType.MouseDown &&
-            Event.current.button == 0 && r.Contains(Event.current.mousePosition))
-        {
+        string cmp = CompareLabel(item);
+        Color chipBg = better ? RPGUI.Good : (worse ? new Color(0.35f, 0.28f, 0.28f, 1f) : new Color(0.28f, 0.32f, 0.4f, 1f));
+        RPGUI.DrawChip(new Rect(x + width - 210f, y + 12f, 88f, 28f), cmp, chipBg);
+
+        if (bagIndex >= 0 &&
+            RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), "Equip", better))
             EquipFromBag(bagIndex);
-            Event.current.Use();
-        }
     }
 }
