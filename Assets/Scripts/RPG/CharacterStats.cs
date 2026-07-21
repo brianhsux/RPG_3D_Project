@@ -82,6 +82,9 @@ public class CharacterStats : MonoBehaviour
             : amount;
 
         currentHealth = Mathf.Max(0f, currentHealth - finalDmg);
+
+        DamageNumbers.Spawn(transform.position, finalDmg, isPlayer, isBoss);
+
         if (currentHealth <= 0f)
             Die();
     }
