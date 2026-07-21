@@ -31,12 +31,36 @@ public static class SetupNGOMenu
                     EnsureEnemyPrefab();
                     Debug.Log("[NGO] Auto-created Resources/NetworkEnemy.prefab");
                 }
+                DisableSceneManagementOnOpenManagers();
             }
             catch (System.Exception e)
             {
                 Debug.LogWarning($"[NGO] Prefab auto-create deferred: {e.Message}");
             }
         };
+
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+        EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+    }
+
+    static void OnPlayModeStateChanged(PlayModeStateChange state)
+    {
+        // Run while still in edit mode so NGO's "add scene to build" dialog does not appear.
+        if (state == PlayModeStateChange.ExitingEditMode)
+            DisableSceneManagementOnOpenManagers();
+    }
+
+    static void DisableSceneManagementOnOpenManagers()
+    {
+        var managers = Object.FindObjectsByType<NetworkManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < managers.Length; i++)
+        {
+            var nm = managers[i];
+            if (nm == null || nm.NetworkConfig == null) continue;
+            if (!nm.NetworkConfig.EnableSceneManagement) continue;
+            nm.NetworkConfig.EnableSceneManagement = false;
+            EditorUtility.SetDirty(nm);
+        }
     }
 
     [MenuItem("RPG/Setup NGO Scene & Prefab")]

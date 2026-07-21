@@ -238,7 +238,7 @@ public class NetBootstrap : MonoBehaviour
     void SuspendSoloPlayer()
     {
         if (_soloPlayerSuspended) return;
-        var solo = GameObject.FindGameObjectWithTag("Player");
+        var solo = FindSoloHero();
         if (solo == null) return;
 
         var pc = solo.GetComponent<PlayerController>();
@@ -256,7 +256,7 @@ public class NetBootstrap : MonoBehaviour
     void RestoreSoloPlayer()
     {
         if (!_soloPlayerSuspended) return;
-        var solo = GameObject.FindGameObjectWithTag("Player");
+        var solo = FindSoloHero();
         if (solo != null)
         {
             var pc = solo.GetComponent<PlayerController>();
@@ -267,5 +267,17 @@ public class NetBootstrap : MonoBehaviour
                 r.enabled = true;
         }
         _soloPlayerSuspended = false;
+    }
+
+    static GameObject FindSoloHero()
+    {
+        var players = GameObject.FindGameObjectsWithTag("Player");
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (players[i] == null) continue;
+            if (players[i].GetComponent<NetworkPlayer>() != null) continue;
+            return players[i];
+        }
+        return null;
     }
 }

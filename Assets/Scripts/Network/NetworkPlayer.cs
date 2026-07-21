@@ -15,6 +15,9 @@ public class NetworkPlayer : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        // Portals / zone triggers look for the Player tag.
+        gameObject.tag = "Player";
+
         EnsureVisual();
         ApplyTint(IsOwner ? ownerColor : remoteColor);
 
@@ -68,7 +71,13 @@ public class NetworkPlayer : NetworkBehaviour
 
     static Transform FindSoloPlayerTransform()
     {
-        var solo = GameObject.FindGameObjectWithTag("Player");
-        return solo != null ? solo.transform : null;
+        var players = GameObject.FindGameObjectsWithTag("Player");
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (players[i] == null) continue;
+            if (players[i].GetComponent<NetworkPlayer>() != null) continue;
+            return players[i].transform;
+        }
+        return null;
     }
 }

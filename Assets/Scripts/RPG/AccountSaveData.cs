@@ -1,6 +1,40 @@
 using System;
 using UnityEngine;
 
+/// <summary>
+/// Socket gems only — must NOT nest ItemSaveData (JsonUtility recursion depth limit).
+/// </summary>
+[Serializable]
+public class GemSaveData
+{
+    public string displayName;
+    public int rarity;
+    public int itemLevel;
+    public int gemKind;
+
+    public static GemSaveData From(ItemInstance gem)
+    {
+        if (gem == null || gem.slot != ItemSlot.Gem) return null;
+        if (string.IsNullOrEmpty(gem.displayName) || gem.itemLevel < 1) return null;
+        return new GemSaveData
+        {
+            displayName = gem.displayName,
+            rarity = (int)gem.rarity,
+            itemLevel = gem.itemLevel,
+            gemKind = (int)gem.gemKind
+        };
+    }
+
+    public ItemInstance ToItem()
+    {
+        if (string.IsNullOrEmpty(displayName) || itemLevel < 1) return null;
+        return GemCatalog.CreateGem(
+            (GemKind)Mathf.Clamp(gemKind, 0, GemCatalog.KindCount - 1),
+            Mathf.Clamp(itemLevel, 1, ProgressionFormulas.MaxItemLevel),
+            (ItemRarity)Mathf.Clamp(rarity, 0, 4));
+    }
+}
+
 [Serializable]
 public class ItemSaveData
 {
@@ -15,7 +49,7 @@ public class ItemSaveData
     public float attackRangeBonus;
     public int weaponProfile;
     public int gemKind;
-    public ItemSaveData[] sockets;
+    public GemSaveData[] sockets;
 
     public bool IsValid
     {
@@ -54,12 +88,12 @@ public class ItemSaveData
             return null;
 
         GemCatalog.EnsureSockets(item);
-        ItemSaveData[] sockSave = null;
+        GemSaveData[] sockSave = null;
         if (item.sockets != null && item.socketCount > 0)
         {
-            sockSave = new ItemSaveData[GemCatalog.MaxSockets];
+            sockSave = new GemSaveData[GemCatalog.MaxSockets];
             for (int i = 0; i < item.socketCount && i < item.sockets.Length; i++)
-                sockSave[i] = From(item.sockets[i]);
+                sockSave[i] = GemSaveData.From(item.sockets[i]);
         }
 
         return new ItemSaveData

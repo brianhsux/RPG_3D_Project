@@ -99,7 +99,7 @@ public class NetHud : MonoBehaviour
             }
 
             RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH),
-                "LMB/F attack · Host spawns 3 test enemies", RPGUI.FieldTag);
+                "LMB/F attack · Host syncs map enemies", RPGUI.FieldTag);
         }
     }
 

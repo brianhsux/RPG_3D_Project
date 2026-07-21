@@ -1,14 +1,14 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
 
 /// <summary>
-/// Host-only combat arena helpers: register enemy prefab and spawn test mobs.
+/// Host-only: register NetworkEnemy prefab and spawn adventure / sandbox enemies.
 /// </summary>
 public class NetCombatSession : MonoBehaviour
 {
     public const string EnemyPrefabResource = "NetworkEnemy";
-    public const int TestEnemyCount = 3;
 
     public static NetCombatSession Instance { get; private set; }
 
@@ -16,7 +16,7 @@ public class NetCombatSession : MonoBehaviour
     public GameObject enemyPrefab;
 
     GameObject _runtimeEnemyTemplate;
-    bool _spawnedTestEnemies;
+    readonly List<NetworkObject> _spawned = new List<NetworkObject>();
 
     void Awake()
     {
@@ -51,57 +51,113 @@ public class NetCombatSession : MonoBehaviour
         var nm = NetworkManager.Singleton;
         if (nm == null || !nm.IsServer) return;
         RegisterPrefabs(nm);
-        // Delay one frame so the host player object exists for positioning.
-        CancelInvoke(nameof(SpawnTestEnemies));
-        Invoke(nameof(SpawnTestEnemies), 0.15f);
+        // Convert any already-built local adventure mobs into network spawns.
+        CancelInvoke(nameof(ConvertLocalWorldEnemies));
+        Invoke(nameof(ConvertLocalWorldEnemies), 0.2f);
     }
 
     public void OnShutdown()
     {
-        CancelInvoke(nameof(SpawnTestEnemies));
-        _spawnedTestEnemies = false;
-        // NetworkManager.Shutdown despawns network objects; nothing else required.
+        CancelInvoke(nameof(ConvertLocalWorldEnemies));
+        DespawnAllAdventureEnemies();
     }
 
-    public void SpawnTestEnemies()
+    public void DespawnAllAdventureEnemies()
     {
+        if (!NetPlay.IsServer) return;
+
+        for (int i = _spawned.Count - 1; i >= 0; i--)
+        {
+            var no = _spawned[i];
+            if (no != null && no.IsSpawned)
+                no.Despawn(true);
+        }
+        _spawned.Clear();
+
+        // Also catch any NetworkEnemy not tracked (e.g. after domain reload).
+        var enemies = FindObjectsByType<NetworkEnemy>(FindObjectsSortMode.None);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            var no = enemies[i] != null ? enemies[i].GetComponent<NetworkObject>() : null;
+            if (no != null && no.IsSpawned)
+                no.Despawn(true);
+        }
+    }
+
+    /// <summary>Destroy local (non-network) EnemyAI and re-run zone enemy spawns as NetworkEnemy.</summary>
+    public void ConvertLocalWorldEnemies()
+    {
+        if (!NetPlay.IsServer) return;
+        if (MapRuntimeBuilder.Instance == null) return;
+
+        DespawnAllAdventureEnemies();
+        DestroyLocalOnlyEnemies();
+        MapRuntimeBuilder.Instance.RespawnZoneEnemiesForHost();
+    }
+
+    public static void DestroyLocalOnlyEnemies()
+    {
+        var ais = Object.FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
+        for (int i = 0; i < ais.Length; i++)
+        {
+            var ai = ais[i];
+            if (ai == null) continue;
+            if (ai.GetComponent<NetworkObject>() != null) continue;
+            Object.Destroy(ai.gameObject);
+        }
+    }
+
+    public GameObject SpawnAdventureEnemy(
+        string name,
+        Vector3 pos,
+        Vector3 zoneCenter,
+        int level,
+        bool isBoss,
+        EnemyKind kind,
+        int mapIndex,
+        float moveSpeed,
+        float leashRadius)
+    {
+        if (!NetPlay.IsServer) return null;
+
         var nm = NetworkManager.Singleton;
-        if (nm == null || !nm.IsServer) return;
-        if (_spawnedTestEnemies) return;
+        if (nm == null) return null;
+        RegisterPrefabs(nm);
 
         var prefab = ResolveEnemyPrefab();
         if (prefab == null)
         {
-            Debug.LogError("[NetCombat] Cannot spawn — NetworkEnemy prefab missing.");
-            return;
+            Debug.LogError("[NetCombat] Cannot spawn adventure enemy — prefab missing.");
+            return null;
         }
 
-        Vector3 origin = FindHostSpawnOrigin();
-        Vector3[] offsets =
-        {
-            new Vector3(4f, 0f, 3f),
-            new Vector3(-4f, 0f, 4f),
-            new Vector3(2f, 0f, -5f),
-        };
+        var go = Instantiate(prefab, pos, Quaternion.identity);
+        go.name = name;
+        go.SetActive(true);
+        // Do NOT SetParent before Spawn — NGO forbids re-parenting unspawned NetworkObjects.
 
-        int count = Mathf.Min(TestEnemyCount, offsets.Length);
-        for (int i = 0; i < count; i++)
+        var enemy = go.GetComponent<NetworkEnemy>();
+        if (enemy == null)
         {
-            var go = Instantiate(prefab, origin + offsets[i], Quaternion.identity);
-            go.name = $"NetworkEnemy_{i}";
-            go.SetActive(true);
-            var no = go.GetComponent<NetworkObject>();
-            if (no == null)
-            {
-                Debug.LogError("[NetCombat] Prefab missing NetworkObject.");
-                Destroy(go);
-                continue;
-            }
-            no.Spawn(true);
+            Debug.LogError("[NetCombat] Prefab missing NetworkEnemy.");
+            Destroy(go);
+            return null;
         }
 
-        _spawnedTestEnemies = true;
-        Debug.Log($"[NetCombat] Spawned {count} test enemies near {origin}");
+        enemy.ConfigureAdventureBeforeSpawn(kind, level, isBoss, mapIndex, zoneCenter, moveSpeed, leashRadius);
+
+        var no = go.GetComponent<NetworkObject>();
+        if (no == null)
+        {
+            Destroy(go);
+            return null;
+        }
+
+        no.Spawn(true);
+        // Keep enemies unparented: parenting a NetworkObject to a plain Transform is fragile,
+        // and map rebuild already despawns via NetCombatSession tracking.
+        _spawned.Add(no);
+        return go;
     }
 
     GameObject ResolveEnemyPrefab()
@@ -129,23 +185,5 @@ public class NetCombatSession : MonoBehaviour
         _runtimeEnemyTemplate = go;
         Debug.Log("[NetCombat] Built runtime NetworkEnemy template.");
         return go;
-    }
-
-    static Vector3 FindHostSpawnOrigin()
-    {
-        var local = NetworkManager.Singleton != null
-            ? NetworkManager.Singleton.SpawnManager?.GetLocalPlayerObject()
-            : null;
-        if (local != null)
-            return local.transform.position;
-
-        var players = Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
-        if (players != null && players.Length > 0 && players[0] != null)
-            return players[0].transform.position;
-
-        var solo = GameObject.FindGameObjectWithTag("Player");
-        if (solo != null) return solo.transform.position;
-
-        return Vector3.zero;
     }
 }

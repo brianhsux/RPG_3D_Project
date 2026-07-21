@@ -65,6 +65,9 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     public void BuildCurrentWorld()
     {
+        if (NetPlay.IsServer)
+            NetCombatSession.Instance?.DespawnAllAdventureEnemies();
+
         if (_root != null)
             Destroy(_root.gameObject);
 
@@ -977,6 +980,9 @@ public class MapRuntimeBuilder : MonoBehaviour
     /// <summary>Spawns a non-respawning challenge mob (used by ChallengeAltar waves).</summary>
     public GameObject SpawnChallengeEnemy(string name, Vector3 pos, Vector3 zoneCenter, int level, bool isBoss, EnemyKind kind, int mapIndex)
     {
+        // Challenge waves stay local for now; pure clients skip to avoid duplicates.
+        if (NetPlay.IsClientOnly) return null;
+
         Transform parent = _root != null ? _root : transform;
         var go = CreateEnemy(parent, name, pos, zoneCenter, level, isBoss, kind, mapIndex);
         if (go == null) return null;
@@ -996,15 +1002,32 @@ public class MapRuntimeBuilder : MonoBehaviour
         return go;
     }
 
+    /// <summary>Host re-spawns zone enemies as NetworkEnemy after converting from local AI.</summary>
+    public void RespawnZoneEnemiesForHost()
+    {
+        if (!NetPlay.IsServer) return;
+        if (_root == null) return;
+
+        int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
+        if (world < 1) world = 1;
+
+        for (int map = 1; map <= 4; map++)
+            SpawnEnemiesInZone(_root, world, map, _zoneCenters[map]);
+    }
+
     void SpawnEnemiesInZone(Transform parent, int world, int map, Vector3 center)
     {
+        // Pure clients receive Host-spawned NetworkEnemy instances instead.
+        if (NetPlay.IsClientOnly) return;
+
         int level = ProgressionFormulas.ContentLevel(world, map);
+        bool useNet = NetPlay.IsServer;
 
         // Map 4: boss only.
         if (map == 4)
         {
             Vector3 bossOff = new Vector3(0f, 0f, 3f);
-            CreateEnemy(parent, $"M{map}_Boss", center + bossOff, center, level, true, EnemyKind.WorldBoss, map);
+            SpawnOneEnemy(parent, $"M{map}_Boss", center + bossOff, center, level, true, EnemyKind.WorldBoss, map, useNet, 9f);
             return;
         }
 
@@ -1022,15 +1045,53 @@ public class MapRuntimeBuilder : MonoBehaviour
 
         Vector3[] localSpots = WorldLayoutProfiles.MobLocalSpots(pattern, count);
         float leashMul = _layout != null ? _layout.leashMul : 1f;
+        float leash = 9f * leashMul;
 
         for (int i = 0; i < count; i++)
+            SpawnOneEnemy(parent, $"M{map}_Mob{i}_{kind}", center + localSpots[i], center, level, false, kind, map, useNet, leash);
+    }
+
+    void SpawnOneEnemy(
+        Transform parent,
+        string name,
+        Vector3 pos,
+        Vector3 zoneCenter,
+        int level,
+        bool isBoss,
+        EnemyKind kind,
+        int mapIndex,
+        bool useNet,
+        float leashRadius)
+    {
+        if (useNet)
         {
-            var go = CreateEnemy(parent, $"M{map}_Mob{i}_{kind}", center + localSpots[i], center, level, false, kind, map);
-            if (go == null) continue;
-            var ai = go.GetComponent<EnemyAI>();
-            if (ai != null)
-                ai.leashRadius = 9f * leashMul;
+            float move = ProgressionFormulas.MobMoveSpeed(level, isBoss);
+            if (kind == EnemyKind.Wolf || kind == EnemyKind.Bat || kind == EnemyKind.Imp ||
+                kind == EnemyKind.ShadowHound || kind == EnemyKind.Mosquito || kind == EnemyKind.Harpy)
+                move *= 1.15f;
+            if (kind == EnemyKind.Golem || kind == EnemyKind.Treant || kind == EnemyKind.Yeti ||
+                kind == EnemyKind.Mummy || kind == EnemyKind.SandWorm || kind == EnemyKind.Tentacle)
+                move *= 0.75f;
+
+            var session = NetCombatSession.Instance;
+            if (session == null && NetBootstrap.Instance != null)
+                session = NetBootstrap.Instance.GetComponent<NetCombatSession>()
+                          ?? NetBootstrap.Instance.gameObject.AddComponent<NetCombatSession>();
+
+            if (session != null)
+            {
+                session.SpawnAdventureEnemy(name, pos, zoneCenter, level, isBoss, kind, mapIndex, move, leashRadius);
+                return;
+            }
+
+            Debug.LogWarning("[MapRuntime] NetCombatSession missing — falling back to local enemy.");
         }
+
+        var go = CreateEnemy(parent, name, pos, zoneCenter, level, isBoss, kind, mapIndex);
+        if (go == null) return;
+        var ai = go.GetComponent<EnemyAI>();
+        if (ai != null)
+            ai.leashRadius = leashRadius;
     }
 
     GameObject CreateEnemy(Transform parent, string name, Vector3 pos, Vector3 zoneCenter, int level, bool isBoss, EnemyKind kind, int mapIndex)

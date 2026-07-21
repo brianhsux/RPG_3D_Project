@@ -101,9 +101,19 @@ public class NetworkPlayerCombat : NetworkBehaviour
         if (!IsServer) return;
         if (CurrentHp.Value <= 0f) return;
 
-        CurrentHp.Value = Mathf.Max(0f, CurrentHp.Value - Mathf.Max(0f, amount));
+        float dealt = Mathf.Max(0f, amount);
+        CurrentHp.Value = Mathf.Max(0f, CurrentHp.Value - dealt);
+        if (dealt >= 0.5f)
+            ShowDamageClientRpc(dealt);
+
         if (CurrentHp.Value <= 0f)
             _respawnAt = Time.time + RespawnDelay;
+    }
+
+    [ClientRpc]
+    void ShowDamageClientRpc(float amount)
+    {
+        DamageNumbers.Spawn(transform.position, amount, true, false);
     }
 
     NetworkEnemy FindNearestEnemyInRange(float range)
