@@ -231,19 +231,124 @@ public class PlayerInventory : MonoBehaviour
         if (gear == null) return false;
         GemCatalog.EnsureSockets(gear);
         if (socketIndex < 0 || socketIndex >= gear.socketCount) return false;
-        if (gear.sockets[socketIndex] != null) return false;
 
+        var old = gear.sockets[socketIndex];
+        // Replacing a filled socket: old gem returns to bag (need free space only when bag is full
+        // after removing the incoming gem — always true since we remove first).
         bag.RemoveAt(bagIndex);
-        // Bag index may shift selection
         if (_selectedGemBagIndex == bagIndex) _selectedGemBagIndex = -1;
         else if (_selectedGemBagIndex > bagIndex) _selectedGemBagIndex--;
 
         gear.sockets[socketIndex] = gem;
+        if (old != null)
+        {
+            if (CountGemsInBag() >= MaxGems)
+            {
+                // Rollback
+                gear.sockets[socketIndex] = old;
+                bag.Insert(Mathf.Clamp(bagIndex, 0, bag.Count), gem);
+                ShowLoot("Gem bag full — cannot swap");
+                return false;
+            }
+            bag.Add(old);
+            ShowLoot($"Replaced {old.displayName} → {gem.displayName}");
+        }
+        else
+            ShowLoot($"Socketed {gem.displayName} → {(intoWeapon ? "Weapon" : "Armor")} slot {socketIndex + 1}");
+
         ApplyEquipmentStats(false);
-        ShowLoot($"Socketed {gem.displayName} → {(intoWeapon ? "Weapon" : "Armor")} slot {socketIndex + 1}");
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
         return true;
+    }
+
+    /// <summary>Bag index of strongest same-kind gem better than <paramref name="current"/>, or -1.</summary>
+    public int FindBetterGemBagIndex(GemKind kind, ItemInstance current)
+    {
+        int best = -1;
+        float bestScore = current != null ? GemCatalog.GemPowerScore(current) : -1f;
+        for (int i = 0; i < bag.Count; i++)
+        {
+            var g = bag[i];
+            if (g == null || g.slot != ItemSlot.Gem || g.gemKind != kind) continue;
+            float s = GemCatalog.GemPowerScore(g);
+            if (s > bestScore + 0.05f)
+            {
+                bestScore = s;
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    public bool HasBetterGemInBag(ItemInstance socketed)
+    {
+        if (socketed == null || socketed.slot != ItemSlot.Gem) return false;
+        return FindBetterGemBagIndex(socketed.gemKind, socketed) >= 0;
+    }
+
+    public bool TryUpgradeSocket(bool fromWeapon, int socketIndex)
+    {
+        var gear = fromWeapon ? equippedWeapon : equippedArmor;
+        if (gear?.sockets == null) return false;
+        if (socketIndex < 0 || socketIndex >= gear.socketCount) return false;
+        var current = gear.sockets[socketIndex];
+        if (current == null) return false;
+
+        int bestIdx = FindBetterGemBagIndex(current.gemKind, current);
+        if (bestIdx < 0) return false;
+        return TrySocketInto(bestIdx, fromWeapon, socketIndex);
+    }
+
+    /// <summary>Swap every socketed gem with a stronger same-type gem from the bag.</summary>
+    public int UpgradeAllGems()
+    {
+        int n = 0;
+        // Repeat passes: upgrading one may free a weaker gem that isn't useful, but bag order changes.
+        for (int pass = 0; pass < 8; pass++)
+        {
+            int before = n;
+            if (equippedWeapon != null)
+            {
+                GemCatalog.EnsureSockets(equippedWeapon);
+                for (int i = 0; i < equippedWeapon.socketCount; i++)
+                    if (TryUpgradeSocket(true, i)) n++;
+            }
+            if (equippedArmor != null)
+            {
+                GemCatalog.EnsureSockets(equippedArmor);
+                for (int i = 0; i < equippedArmor.socketCount; i++)
+                    if (TryUpgradeSocket(false, i)) n++;
+            }
+            if (n == before) break;
+        }
+
+        if (n > 0)
+            ShowLoot($"Upgraded {n} gem slot{(n > 1 ? "s" : "")}");
+        else
+            ShowLoot("No stronger same-type gems in bag");
+        return n;
+    }
+
+    public int CountUpgradeableSockets()
+    {
+        int n = 0;
+        n += CountUpgradeableOn(equippedWeapon);
+        n += CountUpgradeableOn(equippedArmor);
+        return n;
+    }
+
+    int CountUpgradeableOn(ItemInstance gear)
+    {
+        if (gear?.sockets == null) return 0;
+        GemCatalog.EnsureSockets(gear);
+        int n = 0;
+        for (int i = 0; i < gear.socketCount; i++)
+        {
+            var g = gear.sockets[i];
+            if (g != null && HasBetterGemInBag(g)) n++;
+        }
+        return n;
     }
 
     public void Unsocket(bool fromWeapon, int socketIndex)
@@ -626,6 +731,9 @@ public class PlayerInventory : MonoBehaviour
             else if (kb.digit4Key.wasPressedThisFrame || kb.numpad4Key.wasPressedThisFrame) _panelTab = TabGear;
             else if (kb.digit5Key.wasPressedThisFrame || kb.numpad5Key.wasPressedThisFrame) _panelTab = TabGems;
             else if (kb.digit6Key.wasPressedThisFrame || kb.numpad6Key.wasPressedThisFrame) _panelTab = TabPets;
+
+            if (_panelTab == TabEquip && kb.uKey.wasPressedThisFrame)
+                UpgradeAllGems();
         }
     }
 
@@ -858,11 +966,23 @@ public class PlayerInventory : MonoBehaviour
 
     void DrawEquipTab(Rect body)
     {
+        int upgradable = CountUpgradeableSockets();
+        float tipH = 34f;
+        RPGUI.DrawPanel(new Rect(body.x, body.y, body.width, tipH), new Color(0.1f, 0.14f, 0.18f, 0.98f), false);
+        string tip = upgradable > 0
+            ? $"U — upgrade {upgradable} socket(s) with stronger same-type gems from bag"
+            : "U — upgrade gems (same type, higher Lv/rarity) · Select a gem then click a slot to socket/swap";
+        RPGUI.DrawText(new Rect(body.x + 12f, body.y, body.width - 140f, tipH), tip, RPGUI.Hint);
+        if (upgradable > 0 &&
+            RPGUI.ButtonSm(new Rect(body.xMax - 120f, body.y + 3f, 108f, 28f), $"Upgrade ({upgradable})", true))
+            UpgradeAllGems();
+
+        float top = body.y + tipH + 8f;
         float gap = 12f;
         float cardW = (body.width - gap) * 0.5f;
-        float cardH = body.height;
-        DrawEquippedCard(body.x, body.y, cardW, cardH, "Weapon", equippedWeapon, true);
-        DrawEquippedCard(body.x + cardW + gap, body.y, cardW, cardH, "Armor", equippedArmor, false);
+        float cardH = body.yMax - top;
+        DrawEquippedCard(body.x, top, cardW, cardH, "Weapon", equippedWeapon, true);
+        DrawEquippedCard(body.x + cardW + gap, top, cardW, cardH, "Armor", equippedArmor, false);
     }
 
     void DrawBagListTab(Rect body, bool gems)
@@ -879,7 +999,7 @@ public class PlayerInventory : MonoBehaviour
         float y = body.y;
         if (gems)
             RPGUI.DrawText(new Rect(body.x, y, body.width, RPGUI.HintH),
-                $"Gems {gemCount}/{MaxGems}  ·  Select a gem, then socket on Equip", RPGUI.Hint);
+                $"Gems {gemCount}/{MaxGems}  ·  Select → Equip tab to socket  ·  U upgrades same-type sockets", RPGUI.Hint);
         else
             RPGUI.DrawText(new Rect(body.x, y, body.width, RPGUI.HintH),
                 $"Gear {gearCount}/{MaxGear}  ·  {CountUpgradesInBag()} upgrade(s) ready", RPGUI.Hint);
@@ -1040,6 +1160,7 @@ public class PlayerInventory : MonoBehaviour
     {
         bool waitingGem = _selectedGemBagIndex >= 0 && _selectedGemBagIndex < bag.Count
             && bag[_selectedGemBagIndex] != null && bag[_selectedGemBagIndex].slot == ItemSlot.Gem;
+        ItemInstance selectedGem = waitingGem ? bag[_selectedGemBagIndex] : null;
 
         Rect r = new Rect(x, y, width, height);
         RPGUI.DrawPanel(r, new Color(0.12f, 0.14f, 0.2f, 0.98f), false);
@@ -1057,63 +1178,49 @@ public class PlayerInventory : MonoBehaviour
         }
 
         GemCatalog.EnsureSockets(item);
-        var gearGems = GemCatalog.BonusesFromGear(item);
 
-        float bodyY = y + 30f;
-        RPGUI.DrawItemIcon(new Rect(x + 10f, bodyY, 52f, 52f), item);
+        float bodyY = y + 28f;
+        RPGUI.DrawItemIcon(new Rect(x + 10f, bodyY, 48f, 48f), item);
 
-        float textX = x + 72f;
-        float textW = width - 84f;
+        float textX = x + 68f;
+        float textW = width - 80f;
 
         GUI.color = item.RarityColor;
         RPGUI.DrawText(new Rect(textX, bodyY, textW, RPGUI.ItemNameH), item.displayName, RPGUI.ItemName);
         GUI.color = Color.white;
 
-        // Base vs gem contribution
         if (isWeapon)
         {
-            RPGUI.DrawText(new Rect(textX, bodyY + 34f, textW, RPGUI.FieldTagH),
-                $"ATK {item.attack:0} · {ItemFactory.ProfileLabel(item.weaponProfile)} · SPD +{item.attackSpeedBonus * 100f:0}% · RNG +{item.attackRangeBonus:0.0}",
-                RPGUI.FieldTag);
-            string gemAtk = gearGems.attackFlat > 0.05f || gearGems.attackPercent > 0.001f
-                || gearGems.fireDamage + gearGems.iceDamage + gearGems.poisonDamage > 0.05f
-                ? GemCatalog.FormatBonusSummary(gearGems)
-                : "No gems socketed yet";
-            if (gemAtk.Length > 42) gemAtk = gemAtk.Substring(0, 40) + "..";
-            GUI.color = new Color(0.55f, 1f, 0.7f);
-            RPGUI.DrawText(new Rect(textX, bodyY + 54f, textW, RPGUI.FieldTagH), "Gems: " + gemAtk, RPGUI.FieldTag);
-            GUI.color = Color.white;
+            RPGUI.DrawText(new Rect(textX, bodyY + 32f, textW, RPGUI.FieldTagH),
+                $"ATK {item.attack:0}  ·  {ItemFactory.ProfileLabel(item.weaponProfile)}", RPGUI.FieldTag);
+            RPGUI.DrawText(new Rect(textX, bodyY + 52f, textW, RPGUI.FieldTagH),
+                $"SPD +{item.attackSpeedBonus * 100f:0}%   RNG +{item.attackRangeBonus:0.0}", RPGUI.FieldTag);
         }
         else
         {
-            RPGUI.DrawText(new Rect(textX, bodyY + 34f, textW, RPGUI.FieldTagH),
-                $"Base DEF {item.defense:0}  HP +{item.maxHpBonus:0}", RPGUI.FieldTag);
-            string gemDef = CountFilledSockets(item) > 0
-                ? GemCatalog.FormatBonusSummary(gearGems)
-                : "No gems socketed yet";
-            if (gemDef.Length > 42) gemDef = gemDef.Substring(0, 40) + "..";
-            GUI.color = new Color(0.55f, 1f, 0.7f);
-            RPGUI.DrawText(new Rect(textX, bodyY + 54f, textW, RPGUI.FieldTagH), "Gems: " + gemDef, RPGUI.FieldTag);
-            GUI.color = Color.white;
+            RPGUI.DrawText(new Rect(textX, bodyY + 36f, textW, RPGUI.FieldTagH),
+                $"DEF {item.defense:0}   HP +{item.maxHpBonus:0}", RPGUI.FieldTag);
         }
 
-        // Socket slots — large, labeled
         float sockTop = y + 100f;
         RPGUI.DrawText(new Rect(x + 12f, sockTop, width - 24f, RPGUI.FieldTagH),
             $"Sockets {CountFilledSockets(item)}/{item.socketCount}" +
-            (item.socketCount == 0 ? "  (need Uncommon+ rarity)" : ""), RPGUI.FieldTag);
+            (item.socketCount == 0 ? "  (need Uncommon+)" : ""), RPGUI.FieldTag);
 
-        float rowY = sockTop + 26f;
+        float rowH = 54f;
+        float rowY = sockTop + 24f;
         for (int i = 0; i < GemCatalog.MaxSockets; i++)
         {
-            float sy = rowY + i * 36f;
-            Rect sr = new Rect(x + 12f, sy, width - 24f, 32f);
+            float sy = rowY + i * (rowH + 6f);
+            if (sy + rowH > y + height - 8f) break;
+
+            Rect sr = new Rect(x + 10f, sy, width - 20f, rowH);
             bool usable = i < item.socketCount;
 
             if (!usable)
             {
-                RPGUI.Fill(sr, new Color(0.07f, 0.07f, 0.09f, 0.6f));
-                RPGUI.DrawText(new Rect(sr.x + 8f, sr.y, sr.width - 16f, sr.height),
+                RPGUI.Fill(sr, new Color(0.07f, 0.07f, 0.09f, 0.55f));
+                RPGUI.DrawText(new Rect(sr.x + 10f, sr.y, sr.width - 20f, sr.height),
                     $"Slot {i + 1}  — locked", RPGUI.FieldTag);
                 continue;
             }
@@ -1121,26 +1228,48 @@ public class PlayerInventory : MonoBehaviour
             var gem = item.sockets[i];
             if (gem != null)
             {
-                RPGUI.Fill(sr, new Color(0.14f, 0.16f, 0.22f, 1f));
+                bool canUpgrade = HasBetterGemInBag(gem);
+                RPGUI.Fill(sr, canUpgrade
+                    ? new Color(0.16f, 0.28f, 0.18f, 1f)
+                    : new Color(0.14f, 0.16f, 0.22f, 1f));
                 RPGUI.Fill(new Rect(sr.x, sr.y, 6f, sr.height), GemCatalog.KindColor(gem.gemKind));
-                RPGUI.DrawItemIcon(new Rect(sr.x + 10f, sr.y + 2f, 28f, 28f), gem);
-                string line = $"{gem.displayName}  ·  {GemCatalog.StatsLine(gem)}";
-                if (line.Length > 36) line = line.Substring(0, 34) + "..";
-                RPGUI.DrawText(new Rect(sr.x + 44f, sr.y, sr.width - 130f, sr.height), line, RPGUI.FieldTag);
-                if (RPGUI.ButtonSm(new Rect(sr.xMax - 78f, sr.y + 2f, 70f, 28f), "Remove"))
+                RPGUI.DrawItemIcon(new Rect(sr.x + 12f, sr.y + 8f, 38f, 38f), gem);
+
+                float labelW = sr.width - (canUpgrade ? 200f : 120f);
+                GUI.color = gem.RarityColor;
+                RPGUI.DrawText(new Rect(sr.x + 58f, sr.y + 4f, labelW, 24f),
+                    $"{gem.displayName}  Lv{gem.itemLevel}", RPGUI.Hint);
+                GUI.color = Color.white;
+                RPGUI.DrawText(new Rect(sr.x + 58f, sr.y + 28f, labelW, 22f),
+                    GemCatalog.StatsLine(gem), RPGUI.FieldTag);
+
+                if (canUpgrade)
+                {
+                    if (RPGUI.ButtonSm(new Rect(sr.xMax - 178f, sr.y + 12f, 88f, 30f), "Upgrade", true))
+                        TryUpgradeSocket(isWeapon, i);
+                }
+
+                if (RPGUI.ButtonSm(new Rect(sr.xMax - 82f, sr.y + 12f, 72f, 30f), "Remove"))
                     Unsocket(isWeapon, i);
+
+                if (waitingGem && Event.current.type == EventType.MouseDown &&
+                    Event.current.button == 0 &&
+                    new Rect(sr.x, sr.y, sr.width - 190f, sr.height).Contains(Event.current.mousePosition))
+                {
+                    TrySocketInto(_selectedGemBagIndex, isWeapon, i);
+                    Event.current.Use();
+                }
             }
             else
             {
-                // Empty — highlight if gem selected
                 Color emptyBg = waitingGem
                     ? new Color(0.18f, 0.42f, 0.28f, 1f)
-                    : new Color(0.16f, 0.18f, 0.24f, 1f);
+                    : new Color(0.15f, 0.17f, 0.23f, 1f);
                 RPGUI.Fill(sr, emptyBg);
                 string label = waitingGem
-                    ? $"Slot {i + 1}  (+) Click to socket"
-                    : $"Slot {i + 1}  empty — select a gem below";
-                RPGUI.DrawText(new Rect(sr.x + 10f, sr.y, sr.width - 20f, sr.height), label, RPGUI.Hint);
+                    ? $"Slot {i + 1}  empty — click to socket {selectedGem.displayName}"
+                    : $"Slot {i + 1}  empty — open Gems tab, Select, then click here";
+                RPGUI.DrawText(new Rect(sr.x + 12f, sr.y, sr.width - 24f, sr.height), label, RPGUI.Hint);
 
                 if (waitingGem && Event.current.type == EventType.MouseDown &&
                     Event.current.button == 0 && sr.Contains(Event.current.mousePosition))
@@ -1176,10 +1305,12 @@ public class PlayerInventory : MonoBehaviour
         var equipped = item.slot == ItemSlot.Weapon ? equippedWeapon : equippedArmor;
         bool better = !isGem && IsBetterGear(item, equipped);
         bool worse = !isGem && equipped != null && !better && GearScore(item) < GearScore(equipped) - 0.5f;
+        bool gemUpgrade = isGem && IsGemUpgradeForEquipped(item);
 
         Rect r = new Rect(x, y, width, rowH);
         Color bg;
         if (selected) bg = new Color(0.16f, 0.32f, 0.22f, 0.98f);
+        else if (gemUpgrade) bg = new Color(0.12f, 0.22f, 0.14f, 0.96f);
         else if (isGem) bg = new Color(0.12f, 0.1f, 0.16f, 0.96f);
         else if (better) bg = new Color(0.1f, 0.18f, 0.14f, 0.96f);
         else bg = new Color(0.11f, 0.12f, 0.16f, 0.94f);
@@ -1217,18 +1348,16 @@ public class PlayerInventory : MonoBehaviour
         if (isGem)
         {
             RPGUI.DrawChip(new Rect(x + width - 210f, y + 12f, 88f, 28f),
-                selected ? "Selected" : "Gem",
-                selected ? RPGUI.Good : GemCatalog.KindColor(item.gemKind));
+                selected ? "Selected" : (gemUpgrade ? "Better!" : "Gem"),
+                selected ? RPGUI.Good : (gemUpgrade ? RPGUI.Good : GemCatalog.KindColor(item.gemKind)));
 
             string btn = selected ? "Cancel" : "Select";
             if (bagIndex >= 0 &&
-                RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), btn, !selected))
+                RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), btn, !selected || gemUpgrade))
             {
                 _selectedGemBagIndex = selected ? -1 : bagIndex;
                 if (!selected) _panelTab = TabEquip;
             }
-
-            // Also: quick socket into first empty if already selected and click again? handled by Cancel/Select
         }
         else
         {
@@ -1240,5 +1369,23 @@ public class PlayerInventory : MonoBehaviour
                 RPGUI.ButtonSm(new Rect(x + width - 112f, y + 24f, 100f, RPGUI.ButtonSmH), "Equip", better))
                 EquipFromBag(bagIndex);
         }
+    }
+
+    bool IsGemUpgradeForEquipped(ItemInstance gem)
+    {
+        if (gem == null || gem.slot != ItemSlot.Gem) return false;
+        return SocketHasWeakerSameKind(equippedWeapon, gem) || SocketHasWeakerSameKind(equippedArmor, gem);
+    }
+
+    static bool SocketHasWeakerSameKind(ItemInstance gear, ItemInstance candidate)
+    {
+        if (gear?.sockets == null) return false;
+        for (int i = 0; i < gear.socketCount && i < gear.sockets.Length; i++)
+        {
+            var s = gear.sockets[i];
+            if (s != null && GemCatalog.IsStrongerGem(candidate, s))
+                return true;
+        }
+        return false;
     }
 }

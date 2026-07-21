@@ -308,4 +308,20 @@ public static class GemCatalog
             default: return "";
         }
     }
+
+    /// <summary>Higher = stronger gem for same-kind upgrade comparisons.</summary>
+    public static float GemPowerScore(ItemInstance gem)
+    {
+        if (gem == null || gem.slot != ItemSlot.Gem) return -1f;
+        return gem.itemLevel * 10f + (int)gem.rarity * 28f + PowerScale(gem.itemLevel, gem.rarity);
+    }
+
+    public static bool IsStrongerGem(ItemInstance candidate, ItemInstance current)
+    {
+        if (candidate == null || candidate.slot != ItemSlot.Gem) return false;
+        if (current == null) return true;
+        if (current.slot != ItemSlot.Gem) return true;
+        if (candidate.gemKind != current.gemKind) return false;
+        return GemPowerScore(candidate) > GemPowerScore(current) + 0.05f;
+    }
 }

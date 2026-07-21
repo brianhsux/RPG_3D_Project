@@ -16,6 +16,7 @@ public static class EnemyVisuals
             {
                 VisualPrefabUtil.SpawnLocal(
                     prefab, root, "Model", Vector3.zero, Vector3.zero, scale * mul, stripColliders: true);
+                NormalizeVisualHeight(root, TargetVisualHeight(kind, scale));
                 return;
             }
         }
@@ -53,6 +54,77 @@ public static class EnemyVisuals
             case EnemyKind.Tentacle: BuildTentacle(root, scale); break;
             case EnemyKind.WorldBoss: BuildWorldBoss(root, scale); break;
             default: BuildSlime(root, scale); break;
+        }
+
+        NormalizeVisualHeight(root, TargetVisualHeight(kind, scale));
+    }
+
+    static float TargetVisualHeight(EnemyKind kind, float scale)
+    {
+        float h;
+        switch (kind)
+        {
+            case EnemyKind.WorldBoss: h = 3.6f; break;
+            case EnemyKind.Golem:
+            case EnemyKind.Treant:
+            case EnemyKind.Demon:
+            case EnemyKind.Yeti: h = 2.6f; break;
+            case EnemyKind.Wolf:
+            case EnemyKind.Spider:
+            case EnemyKind.Beetle:
+            case EnemyKind.Scorpion:
+            case EnemyKind.ShadowHound:
+            case EnemyKind.Leech:
+            case EnemyKind.Toad:
+            case EnemyKind.Griffon: h = 1.35f; break;
+            case EnemyKind.Bat:
+            case EnemyKind.Mosquito:
+            case EnemyKind.Harpy:
+            case EnemyKind.StormSprite: h = 1.6f; break;
+            case EnemyKind.VoidEye:
+            case EnemyKind.SandWorm: h = 2.2f; break;
+            case EnemyKind.Slime:
+            case EnemyKind.Mushroom:
+            case EnemyKind.LavaSpawn:
+            case EnemyKind.Crystal: h = 1.45f; break;
+            default: h = 2.0f; break;
+        }
+        return h * Mathf.Max(0.5f, scale);
+    }
+
+    /// <summary>
+    /// Prefab variants can differ wildly in authored size (e.g. some Slimes).
+    /// Uniformly rescale the visual so every mob of a kind matches a target height.
+    /// </summary>
+    public static void NormalizeVisualHeight(Transform root, float targetHeight)
+    {
+        if (root == null || targetHeight < 0.2f) return;
+
+        var rends = root.GetComponentsInChildren<Renderer>(true);
+        if (rends == null || rends.Length == 0) return;
+
+        Bounds b = rends[0].bounds;
+        for (int i = 1; i < rends.Length; i++)
+        {
+            if (rends[i] != null)
+                b.Encapsulate(rends[i].bounds);
+        }
+
+        float h = b.size.y;
+        if (h < 0.05f || h > 80f) return;
+
+        float factor = targetHeight / h;
+        // Ignore tiny float error; clamp extreme corrections from broken prefabs.
+        if (factor > 0.92f && factor < 1.08f) return;
+        factor = Mathf.Clamp(factor, 0.15f, 4f);
+
+        Transform model = root.Find("Model");
+        if (model != null)
+            model.localScale *= factor;
+        else
+        {
+            for (int i = 0; i < root.childCount; i++)
+                root.GetChild(i).localScale *= factor;
         }
     }
 
