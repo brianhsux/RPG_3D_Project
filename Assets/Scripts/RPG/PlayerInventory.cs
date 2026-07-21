@@ -389,8 +389,11 @@ public class PlayerInventory : MonoBehaviour
         float armorHp = equippedArmor != null ? equippedArmor.maxHpBonus : 0f;
 
         var gems = GemCatalog.SumSockets(equippedWeapon, equippedArmor);
+        var petBuffs = PlayerPetController.Instance != null
+            ? PlayerPetController.Instance.ActiveOwnerBuffs
+            : default;
 
-        float atk = (baseAtk + weaponAtk + gems.attackFlat) * (1f + gems.attackPercent);
+        float atk = (baseAtk + weaponAtk + gems.attackFlat) * (1f + gems.attackPercent) * (1f + petBuffs.attackPercent);
         float def = (baseDef + armorDef + gems.defenseFlat) * (1f + gems.defensePercent);
         float hp = baseHp + armorHp + gems.maxHpFlat;
 
@@ -402,7 +405,8 @@ public class PlayerInventory : MonoBehaviour
         _stats.attackCooldown = ProgressionFormulas.PlayerBaseAttackCooldown;
         float weaponSpd = equippedWeapon != null ? equippedWeapon.attackSpeedBonus : 0f;
         float weaponRng = equippedWeapon != null ? equippedWeapon.attackRangeBonus : 0f;
-        _stats.attackSpeed = ProgressionFormulas.SoftCapAttackSpeed(1f + weaponSpd + gems.attackSpeed);
+        _stats.attackSpeed = ProgressionFormulas.SoftCapAttackSpeed(
+            1f + weaponSpd + gems.attackSpeed + petBuffs.attackSpeed);
         _stats.attackRange = ProgressionFormulas.SoftCapAttackRange(
             ProgressionFormulas.PlayerBaseAttackRange + weaponRng + gems.attackRange);
 
@@ -415,6 +419,9 @@ public class PlayerInventory : MonoBehaviour
         _stats.iceBonus = gems.iceDamage;
         _stats.poisonBonus = gems.poisonDamage;
         _stats.lifesteal = gems.lifesteal;
+
+        if (PlayerPetController.Instance != null)
+            PlayerPetController.Instance.ApplyMoveSpeedOnly();
 
         if (refillHp || _stats.currentHealth > _stats.maxHealth)
             _stats.currentHealth = _stats.maxHealth;
@@ -687,6 +694,7 @@ public class PlayerInventory : MonoBehaviour
     Vector2 _petScroll;
     Vector2 _statusScroll;
     int _selectedGemBagIndex = -1;
+    string _selectedPetId;
 
     const int TabStatus = 0;
     const int TabInfo = 1;
@@ -706,6 +714,7 @@ public class PlayerInventory : MonoBehaviour
         if (!open)
         {
             _selectedGemBagIndex = -1;
+            _selectedPetId = null;
             _panelTab = TabStatus;
         }
     }
@@ -839,7 +848,7 @@ public class PlayerInventory : MonoBehaviour
         if (_stats == null) _stats = GetComponent<CharacterStats>();
         var prog = PlayerProgression.Instance;
 
-        float contentH = 420f;
+        float contentH = 520f;
         _statusScroll = GUI.BeginScrollView(body, _statusScroll, new Rect(0f, 0f, body.width - 20f, contentH), false, true);
         float x = 4f;
         float y = 4f;
@@ -894,12 +903,27 @@ public class PlayerInventory : MonoBehaviour
             var gems = GemCatalog.SumSockets(equippedWeapon, equippedArmor);
             string bonus = GemCatalog.FormatBonusSummary(gems);
             if (string.IsNullOrEmpty(bonus) || bonus == "No gem bonuses")
+            {
                 RPGUI.DrawText(new Rect(x, y, cw, RPGUI.HintH), "No gems socketed yet — open Gems + Equip", RPGUI.Hint);
+                y += RPGUI.HintH + 12f;
+            }
             else
             {
                 RPGUI.DrawPanel(new Rect(x, y, cw, 52f), new Color(0.1f, 0.14f, 0.2f, 0.98f), false);
                 RPGUI.DrawText(new Rect(x + 12f, y + 8f, cw - 24f, 36f), bonus, RPGUI.Hint);
+                y += 56f;
             }
+
+            RPGUI.DrawText(new Rect(x, y, cw, RPGUI.LabelH), "Pet Bonds (active)", RPGUI.Label);
+            y += RPGUI.LabelH + 4f;
+            var petCtrl = PlayerPetController.Instance;
+            if (petCtrl?.ActivePet != null)
+            {
+                DrawStatRow(x, y, cw, petCtrl.ActivePet.displayName,
+                    PetCatalog.FormatOwnerBuffs(petCtrl.ActiveOwnerBuffs));
+            }
+            else
+                RPGUI.DrawText(new Rect(x, y, cw, RPGUI.HintH), "No pet deployed", RPGUI.Hint);
         }
 
         GUI.EndScrollView();
@@ -1054,54 +1078,137 @@ public class PlayerInventory : MonoBehaviour
         var pets = PlayerPetController.Instance;
         int count = pets != null ? pets.owned.Count : 0;
 
-        // Hint row eats a bit of vertical space.
         RPGUI.DrawText(new Rect(x, listTop, viewW, RPGUI.HintH),
-            $"Pets {count}/{PlayerPetController.MaxPets}  ·  Deploy one combat companion", RPGUI.Hint);
-        float listY = listTop + RPGUI.HintH + 6f;
-        float listH = Mathf.Max(60f, viewH - (RPGUI.HintH + 6f));
+            $"Pets {count}/{PlayerPetController.MaxPets}  ·  Train bonds  ·  Only deployed pet buffs you", RPGUI.Hint);
 
-        float contentH = Mathf.Max(listH, count * rowH + 8f);
-        Rect viewRect = new Rect(x, listY, viewW, listH);
-        _petScroll = GUI.BeginScrollView(viewRect, _petScroll, new Rect(0f, 0f, contentW, contentH), false, true);
+        float splitY = listTop + RPGUI.HintH + 6f;
+        float listW = Mathf.Min(340f, viewW * 0.38f);
+        float detailX = x + listW + 12f;
+        float detailW = viewW - listW - 12f;
+        float areaH = Mathf.Max(80f, viewH - (RPGUI.HintH + 6f));
+
+        // ---- Left: roster ----
+        float listRowH = 78f;
+        float contentH = Mathf.Max(areaH, count * listRowH + 8f);
+        Rect listRect = new Rect(x, splitY, listW, areaH);
+        _petScroll = GUI.BeginScrollView(listRect, _petScroll, new Rect(0f, 0f, listW - 18f, contentH), false, true);
 
         if (pets == null || count == 0)
         {
-            RPGUI.DrawText(new Rect(8f, 16f, contentW - 16f, RPGUI.HintH),
-                "No pets — starter Ember Fox should appear; defeat bosses for more", RPGUI.Hint);
+            RPGUI.DrawText(new Rect(8f, 16f, listW - 24f, RPGUI.HintH),
+                "No pets — defeat bosses for companions", RPGUI.Hint);
             GUI.EndScrollView();
             return;
         }
+
+        if (string.IsNullOrEmpty(_selectedPetId) || FindOwnedPet(_selectedPetId) == null)
+            _selectedPetId = pets.activePetId ?? pets.owned[0].id;
 
         float playerAtk = _stats != null ? _stats.attackDamage : 20f;
         for (int i = 0; i < pets.owned.Count; i++)
         {
             var pet = pets.owned[i];
             if (pet == null) continue;
-            float yy = i * rowH;
+            PetCatalog.EnsureBonds(pet);
+            float yy = i * listRowH;
             bool active = pets.activePetId == pet.id;
+            bool selected = pet.id == _selectedPetId;
 
-            Rect r = new Rect(0f, yy, contentW - 4f, rowH - 6f);
-            RPGUI.DrawPanel(r, active ? new Color(0.14f, 0.22f, 0.18f, 0.98f) : new Color(0.11f, 0.12f, 0.16f, 0.95f), false);
+            Rect r = new Rect(0f, yy, listW - 22f, listRowH - 6f);
+            Color bg = selected
+                ? new Color(0.16f, 0.24f, 0.32f, 0.98f)
+                : (active ? new Color(0.14f, 0.22f, 0.18f, 0.98f) : new Color(0.11f, 0.12f, 0.16f, 0.95f));
+            RPGUI.DrawPanel(r, bg, false);
             RPGUI.Fill(new Rect(r.x, r.y, 5f, r.height), PetCatalog.KindColor(pet.kind));
 
-            RPGUI.Fill(new Rect(r.x + 12f, r.y + 14f, 56f, 56f), new Color(0.08f, 0.08f, 0.1f));
-            RPGUI.Fill(new Rect(r.x + 22f, r.y + 24f, 36f, 36f), PetCatalog.KindColor(pet.kind));
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 0 &&
+                r.Contains(Event.current.mousePosition))
+            {
+                _selectedPetId = pet.id;
+                Event.current.Use();
+            }
 
             GUI.color = PetCatalog.KindColor(pet.kind);
-            RPGUI.DrawText(new Rect(r.x + 80f, r.y + 8f, contentW - 220f, RPGUI.ItemNameH),
-                pet.displayName + (active ? "  [ACTIVE]" : ""), RPGUI.ItemName);
+            RPGUI.DrawText(new Rect(r.x + 12f, r.y + 6f, r.width - 24f, RPGUI.HintH),
+                pet.displayName + (active ? "  [ON]" : ""), RPGUI.Hint);
             GUI.color = Color.white;
-
-            RPGUI.DrawText(new Rect(r.x + 80f, r.y + 48f, contentW - 220f, RPGUI.ItemMetaH),
-                PetCatalog.StatsLine(pet, playerAtk), RPGUI.ItemMeta);
-
-            if (!active && RPGUI.ButtonSm(new Rect(r.xMax - 110f, r.y + 24f, 100f, RPGUI.ButtonSmH), "Deploy", true))
-                pets.SetActive(pet.id);
-            else if (active)
-                RPGUI.DrawChip(new Rect(r.xMax - 110f, r.y + 28f, 100f, 26f), "Fighting", RPGUI.Good);
+            RPGUI.DrawText(new Rect(r.x + 12f, r.y + 34f, r.width - 24f, RPGUI.FieldTagH),
+                $"Lv{pet.level}  ·  {PetCatalog.BondSummaryLine(pet)}", RPGUI.FieldTag);
         }
 
         GUI.EndScrollView();
+
+        // ---- Right: train panel ----
+        var selectedPet = FindOwnedPet(_selectedPetId);
+        if (selectedPet == null) return;
+        PetCatalog.EnsureBonds(selectedPet);
+        bool isActive = pets.activePetId == selectedPet.id;
+
+        RPGUI.DrawPanel(new Rect(detailX, splitY, detailW, areaH), new Color(0.1f, 0.12f, 0.16f, 0.96f), false);
+        float dx = detailX + 12f;
+        float dy = splitY + 10f;
+        float dw = detailW - 24f;
+
+        GUI.color = PetCatalog.KindColor(selectedPet.kind);
+        RPGUI.DrawText(new Rect(dx, dy, dw - 120f, RPGUI.LabelH), selectedPet.displayName, RPGUI.Label);
+        GUI.color = Color.white;
+
+        if (!isActive && RPGUI.ButtonSm(new Rect(detailX + detailW - 120f, dy + 4f, 100f, RPGUI.ButtonSmH), "Deploy", true))
+            pets.SetActive(selectedPet.id);
+        else if (isActive)
+            RPGUI.DrawChip(new Rect(detailX + detailW - 120f, dy + 8f, 100f, 26f), "Fighting", RPGUI.Good);
+
+        dy += RPGUI.LabelH + 4f;
+        RPGUI.DrawText(new Rect(dx, dy, dw, RPGUI.FieldTagH),
+            PetCatalog.StatsLine(selectedPet, playerAtk), RPGUI.FieldTag);
+        dy += RPGUI.FieldTagH + 4f;
+
+        if (isActive)
+        {
+            RPGUI.DrawPanel(new Rect(dx, dy, dw, 36f), new Color(0.12f, 0.2f, 0.16f, 0.98f), false);
+            RPGUI.DrawText(new Rect(dx + 10f, dy, dw - 20f, 36f),
+                "Owner buffs: " + PetCatalog.FormatOwnerBuffs(PetCatalog.ComputeOwnerBuffs(selectedPet)), RPGUI.Hint);
+            dy += 42f;
+        }
+        else
+        {
+            RPGUI.DrawText(new Rect(dx, dy, dw, RPGUI.FieldTagH),
+                "Deploy to apply these bonds to you", RPGUI.FieldTag);
+            dy += RPGUI.FieldTagH + 8f;
+        }
+
+        RPGUI.DrawText(new Rect(dx, dy, dw, RPGUI.HintH),
+            $"Bond points available: {selectedPet.bondPoints}  ·  Kill nearby / level up to earn", RPGUI.Hint);
+        dy += RPGUI.HintH + 8f;
+
+        float bondRowH = 52f;
+        for (int b = 0; b < PetCatalog.BondCount; b++)
+        {
+            var bond = (PetBond)b;
+            Rect br = new Rect(dx, dy, dw, bondRowH - 4f);
+            bool can = PetCatalog.CanTrain(selectedPet, bond);
+            RPGUI.DrawPanel(br, can ? new Color(0.14f, 0.18f, 0.14f, 0.98f) : new Color(0.12f, 0.13f, 0.17f, 0.95f), false);
+
+            RPGUI.DrawText(new Rect(br.x + 10f, br.y + 4f, br.width - 100f, 22f),
+                PetCatalog.BondLabel(bond) + " — " + PetCatalog.BondBlurb(bond), RPGUI.Hint);
+            RPGUI.DrawText(new Rect(br.x + 10f, br.y + 26f, br.width - 100f, 20f),
+                PetCatalog.BondEffectLine(selectedPet, bond), RPGUI.FieldTag);
+
+            if (can && RPGUI.ButtonSm(new Rect(br.xMax - 78f, br.y + 10f, 68f, 30f), "+1", true))
+                pets.TryTrain(selectedPet.id, bond);
+
+            dy += bondRowH;
+        }
+    }
+
+    PetInstance FindOwnedPet(string id)
+    {
+        var pets = PlayerPetController.Instance;
+        if (pets == null || string.IsNullOrEmpty(id)) return null;
+        for (int i = 0; i < pets.owned.Count; i++)
+            if (pets.owned[i] != null && pets.owned[i].id == id)
+                return pets.owned[i];
+        return null;
     }
 
     int CountUpgradesInBag()

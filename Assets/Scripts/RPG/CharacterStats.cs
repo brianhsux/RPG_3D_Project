@@ -117,6 +117,16 @@ public class CharacterStats : MonoBehaviour
         return dealt;
     }
 
+    public void Heal(float amount)
+    {
+        if (isDead || amount <= 0f) return;
+        float before = currentHealth;
+        currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
+        float gained = currentHealth - before;
+        if (gained > 0.5f && isPlayer)
+            DamageNumbers.Spawn(transform.position, gained, true, false);
+    }
+
     public float TakeDamage(float amount, CharacterStats source = null)
     {
         if (isDead) return 0f;
