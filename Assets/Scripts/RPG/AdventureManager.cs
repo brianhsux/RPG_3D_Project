@@ -378,9 +378,8 @@ public class AdventureManager : MonoBehaviour
         RPGUI.DrawText(new Rect(x + 170f, y - 2f, textW - 170f, RPGUI.HintH), bossText, RPGUI.Hint);
         y += 28f;
 
-        string tipText = "1–4 travel · Green gate → Village";
-        if (currentMap == 2) tipText = "1–4 travel · Map 2 Timed Challenge altar (E)";
-        else if (currentMap == 3) tipText = "1–4 travel · Map 3 has crystal mines (E)";
+        string tipText = "1–4 travel · Green gate → Village · Hub challenge altar (E)";
+        if (currentMap == 3) tipText = "1–4 travel · Map 3 has crystal mines (E)";
         RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH), tipText, RPGUI.FieldTag);
 
         if (worldPortalReady)

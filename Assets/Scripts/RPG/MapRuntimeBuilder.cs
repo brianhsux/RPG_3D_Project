@@ -76,6 +76,7 @@ public class MapRuntimeBuilder : MonoBehaviour
         for (int map = 1; map <= 4; map++)
             BuildZone(world, map, _zoneCenters[map]);
 
+        SpawnChallengeAltar(_root, world);
         SpawnVillageReturnGate();
 
         if (AdventureManager.Instance != null && AdventureManager.Instance.worldPortalReady)
@@ -296,6 +297,16 @@ public class MapRuntimeBuilder : MonoBehaviour
         go.transform.localScale = scale;
         var r = go.GetComponent<Renderer>();
         if (r != null) r.sharedMaterial = mat;
+
+        // Thin floor discs / pads use Cylinder CapsuleColliders (or thin BoxColliders) that
+        // block CharacterController. Real walk collision comes from the main Ground cube.
+        bool flatFloorOverlay = scale.y <= 0.12f && Mathf.Max(scale.x, scale.z) >= 1f;
+        if (flatFloorOverlay)
+        {
+            var col = go.GetComponent<Collider>();
+            if (col != null) Object.Destroy(col);
+        }
+
         return go;
     }
 
@@ -384,8 +395,6 @@ public class MapRuntimeBuilder : MonoBehaviour
 
         AddZoneDecor(zoneRoot, world, map, center, zoneSize);
         SpawnOreNodes(zoneRoot, world, map, center, zoneSize);
-        if (map == 2)
-            SpawnChallengeAltar(zoneRoot, world, map, center);
 
         var zone = new GameObject("TileZone_Map" + map);
         zone.transform.SetParent(zoneRoot, false);
@@ -883,15 +892,18 @@ public class MapRuntimeBuilder : MonoBehaviour
         ore.Configure(level, "Crystal Vein", tint);
     }
 
-    void SpawnChallengeAltar(Transform parent, int world, int map, Vector3 center)
+    /// <summary>Open hub arena (NE of crossroads) — away from crowded map zones.</summary>
+    void SpawnChallengeAltar(Transform parent, int world)
     {
-        Vector3 pos = center + new Vector3(0f, 0f, -5.5f);
+        Vector3 pos = new Vector3(10f, 0f, 10f);
         var root = new GameObject("ChallengeAltar");
         root.transform.SetParent(parent, false);
         root.transform.position = pos;
 
+        var pad = MakeTempMat(new Color(0.42f, 0.32f, 0.26f));
         var stone = MakeTempMat(new Color(0.35f, 0.22f, 0.18f));
         var glow = MakeTempMat(new Color(1f, 0.45f, 0.15f));
+        Prim(PrimitiveType.Cylinder, "ArenaPad", pos + new Vector3(0f, 0.03f, 0f), new Vector3(16f, 0.04f, 16f), pad, root.transform);
         Prim(PrimitiveType.Cylinder, "Base", pos + new Vector3(0f, 0.35f, 0f), new Vector3(2.4f, 0.35f, 2.4f), stone, root.transform);
         Prim(PrimitiveType.Cube, "Pillar", pos + new Vector3(0f, 1.4f, 0f), new Vector3(0.7f, 2.2f, 0.7f), stone, root.transform);
         var flame = Prim(PrimitiveType.Sphere, "Flame", pos + new Vector3(0f, 2.7f, 0f), Vector3.one * 0.85f, glow, root.transform);
@@ -900,7 +912,7 @@ public class MapRuntimeBuilder : MonoBehaviour
 
         var altar = root.AddComponent<ChallengeAltar>();
         altar.world = world;
-        altar.mapIndex = map;
+        altar.mapIndex = 2;
     }
 
     /// <summary>Spawns a non-respawning challenge mob (used by ChallengeAltar waves).</summary>
@@ -914,7 +926,7 @@ public class MapRuntimeBuilder : MonoBehaviour
         if (ai != null)
         {
             ai.disableAutoRespawn = true;
-            ai.leashRadius = 14f;
+            ai.leashRadius = 20f;
             ai.homeCenter = zoneCenter;
         }
 

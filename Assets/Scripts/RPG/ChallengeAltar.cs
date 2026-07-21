@@ -2,19 +2,23 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Timed wave challenge on Map 2. Clear for pet egg + legendary gem.
+/// Timed horde challenge at the open world hub.
+/// Waves spawn on a timer (do not wait for a clear). Survive and clear all for rewards.
 /// Press E near the altar to start.
 /// </summary>
 public class ChallengeAltar : MonoBehaviour
 {
     public static ChallengeAltar Active { get; private set; }
 
-    public const int TotalWaves = 5;
-    public const float TimeLimit = 100f;
+    public const int TotalWaves = 10;
+    public const float WaveInterval = 9f;
+    public const float ClearBuffer = 50f;
+    public const float TimeLimit = TotalWaves * WaveInterval + ClearBuffer;
     public const float CooldownSeconds = 90f;
     public const float InteractRange = 3.2f;
 
     public int world = 1;
+    /// <summary>Used for content level / enemy kind (mid-world difficulty).</summary>
     public int mapIndex = 2;
 
     enum State { Idle, Running, Success, Failed, Cooldown }
@@ -22,6 +26,7 @@ public class ChallengeAltar : MonoBehaviour
     State _state = State.Idle;
     int _wave;
     float _timeLeft;
+    float _waveTimer;
     float _cooldownLeft;
     readonly List<CharacterStats> _alive = new List<CharacterStats>();
     string _status = "Timed Challenge Altar";
@@ -92,15 +97,27 @@ public class ChallengeAltar : MonoBehaviour
             }
         }
 
-        if (_alive.Count == 0)
+        // Timed waves: spawn on interval regardless of kills.
+        if (_wave < TotalWaves)
         {
-            if (_wave >= TotalWaves)
-                Succeed();
-            else
+            _waveTimer -= Time.deltaTime;
+            if (_waveTimer <= 0f)
+            {
                 BeginWave(_wave + 1);
+                _waveTimer = WaveInterval;
+            }
         }
 
-        _status = $"Wave {_wave}/{TotalWaves}  ·  {_alive.Count} left  ·  {Mathf.CeilToInt(_timeLeft)}s";
+        if (_wave >= TotalWaves && _alive.Count == 0)
+        {
+            Succeed();
+            return;
+        }
+
+        string next = _wave < TotalWaves
+            ? $"Next {Mathf.CeilToInt(Mathf.Max(0f, _waveTimer))}s"
+            : "Final clear";
+        _status = $"Wave {_wave}/{TotalWaves}  ·  {_alive.Count} alive  ·  {next}  ·  {Mathf.CeilToInt(_timeLeft)}s";
     }
 
     public bool TryInteract()
@@ -125,31 +142,17 @@ public class ChallengeAltar : MonoBehaviour
         _timeLeft = TimeLimit;
         _wave = 0;
         if (PlayerInventory.Instance != null)
-            PlayerInventory.Instance.ShowLoot("Challenge started! Survive the waves!");
+            PlayerInventory.Instance.ShowLoot("Challenge started! Waves arrive on a timer!");
         BeginWave(1);
+        _waveTimer = WaveInterval;
     }
 
     void BeginWave(int wave)
     {
         _wave = wave;
-        _alive.Clear();
 
         int content = ProgressionFormulas.ContentLevel(world, mapIndex);
-        int count;
-        int levelBonus;
-        bool miniBoss = false;
-        switch (wave)
-        {
-            case 1: count = 3; levelBonus = 0; break;
-            case 2: count = 4; levelBonus = 0; break;
-            case 3: count = 5; levelBonus = 1; break;
-            case 4: count = 4; levelBonus = 2; break;
-            default:
-                count = 1;
-                levelBonus = 3;
-                miniBoss = true;
-                break;
-        }
+        GetWaveSpawn(wave, out int count, out int levelBonus, out bool miniBoss);
 
         EnemyKind kind = EnemyVisuals.KindForZone(world, mapIndex);
         var builder = MapRuntimeBuilder.Instance;
@@ -157,8 +160,8 @@ public class ChallengeAltar : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            float ang = (i / (float)Mathf.Max(1, count)) * Mathf.PI * 2f + wave * 0.4f;
-            float rad = 4.5f + (i % 2) * 0.8f;
+            float ang = (i / (float)Mathf.Max(1, count)) * Mathf.PI * 2f + wave * 0.55f;
+            float rad = 5.5f + (i % 3) * 0.9f;
             Vector3 pos = transform.position + new Vector3(Mathf.Cos(ang) * rad, 0f, Mathf.Sin(ang) * rad);
             pos.y = transform.position.y;
 
@@ -176,7 +179,6 @@ public class ChallengeAltar : MonoBehaviour
             if (stats != null)
             {
                 stats.isChallengeEnemy = true;
-                // Mini-boss for wave 5 but not a world boss for portal logic
                 if (miniBoss)
                 {
                     stats.isBoss = false;
@@ -191,6 +193,29 @@ public class ChallengeAltar : MonoBehaviour
 
         if (PlayerInventory.Instance != null)
             PlayerInventory.Instance.ShowLoot($"Wave {_wave}/{TotalWaves}!");
+    }
+
+    static void GetWaveSpawn(int wave, out int count, out int levelBonus, out bool miniBoss)
+    {
+        miniBoss = false;
+        levelBonus = 0;
+        switch (wave)
+        {
+            case 1: count = 2; break;
+            case 2: count = 3; break;
+            case 3: count = 3; levelBonus = 1; break;
+            case 4: count = 4; levelBonus = 1; break;
+            case 5: count = 4; levelBonus = 2; break;
+            case 6: count = 5; levelBonus = 2; break;
+            case 7: count = 5; levelBonus = 3; break;
+            case 8: count = 6; levelBonus = 3; break;
+            case 9: count = 4; levelBonus = 4; break;
+            default:
+                count = 1;
+                levelBonus = 5;
+                miniBoss = true;
+                break;
+        }
     }
 
     public void NotifyEnemyKilled(CharacterStats stats)
@@ -227,14 +252,12 @@ public class ChallengeAltar : MonoBehaviour
         var inv = PlayerInventory.Instance;
         int content = ProgressionFormulas.ContentLevel(world, mapIndex);
 
-        // Legendary gem (or Epic if bag issues)
         var gem = GemCatalog.CreateGem(
             (GemKind)Random.Range(0, 12),
             Mathf.Clamp(content + Random.Range(1, 4), 1, 40),
             ItemRarity.Legendary);
         bool gemOk = inv != null && inv.AddItem(gem);
 
-        // Pet egg
         bool petOk = false;
         if (PlayerPetController.Instance != null)
         {
@@ -284,7 +307,7 @@ public class ChallengeAltar : MonoBehaviour
         if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
 
         RPGUI.Ensure();
-        float w = Mathf.Min(560f, Screen.width - 40f);
+        float w = Mathf.Min(620f, Screen.width - 40f);
         Rect tip = new Rect(Screen.width * 0.5f - w * 0.5f, 70f, w, 44f);
         Color bg = _state == State.Running
             ? new Color(0.25f, 0.12f, 0.08f, 0.92f)

@@ -31,9 +31,25 @@ public class GameManager : MonoBehaviour
 
     public void NotifyEnemyDied(EnemyAI enemy)
     {
-        if (enemy == null || enemy.disableAutoRespawn) return;
+        if (enemy == null) return;
         if (_respawnJobs.ContainsKey(enemy)) return;
+
+        // Challenge / one-shot enemies: brief corpse, then destroy (no respawn).
+        if (enemy.disableAutoRespawn)
+        {
+            _respawnJobs[enemy] = StartCoroutine(DespawnCorpseOnly(enemy));
+            return;
+        }
+
         _respawnJobs[enemy] = StartCoroutine(RespawnAfterDelay(enemy));
+    }
+
+    IEnumerator DespawnCorpseOnly(EnemyAI enemy)
+    {
+        yield return new WaitForSeconds(1.0f);
+        if (enemy != null)
+            Destroy(enemy.gameObject);
+        _respawnJobs.Remove(enemy);
     }
 
     IEnumerator RespawnAfterDelay(EnemyAI enemy)
