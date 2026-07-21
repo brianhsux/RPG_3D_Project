@@ -11,6 +11,9 @@ public class ItemSaveData
     public float attack;
     public float defense;
     public float maxHpBonus;
+    public float attackSpeedBonus;
+    public float attackRangeBonus;
+    public int weaponProfile;
     public int gemKind;
     public ItemSaveData[] sockets;
 
@@ -68,6 +71,9 @@ public class ItemSaveData
             attack = item.attack,
             defense = item.defense,
             maxHpBonus = item.maxHpBonus,
+            attackSpeedBonus = item.attackSpeedBonus,
+            attackRangeBonus = item.attackRangeBonus,
+            weaponProfile = item.weaponProfile,
             sockets = sockSave
         };
     }
@@ -79,7 +85,7 @@ public class ItemSaveData
         if (slot == (int)ItemSlot.Gem)
         {
             return GemCatalog.CreateGem(
-                (GemKind)Mathf.Clamp(gemKind, 0, 11),
+                (GemKind)Mathf.Clamp(gemKind, 0, GemCatalog.KindCount - 1),
                 Mathf.Clamp(itemLevel, 1, 40),
                 (ItemRarity)Mathf.Clamp(rarity, 0, 4));
         }
@@ -93,7 +99,10 @@ public class ItemSaveData
             itemLevel = Mathf.Clamp(itemLevel, 1, 40),
             attack = attack,
             defense = defense,
-            maxHpBonus = maxHpBonus
+            maxHpBonus = maxHpBonus,
+            attackSpeedBonus = attackSpeedBonus,
+            attackRangeBonus = attackRangeBonus,
+            weaponProfile = Mathf.Clamp(weaponProfile, 0, 2)
         };
         GemCatalog.EnsureSockets(item);
         if (sockets != null)

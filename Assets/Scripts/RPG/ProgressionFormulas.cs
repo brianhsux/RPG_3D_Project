@@ -140,6 +140,14 @@ public static class ProgressionFormulas
         return rawDamage * (100f / (100f + Mathf.Max(0f, defense)));
     }
 
+    public const float PlayerBaseAttackCooldown = 0.5f;
+    public const float PlayerBaseAttackRange = 2.6f;
+    public const float MaxPlayerAttackSpeed = 1.75f;
+    public const float MaxPlayerAttackRange = 4.5f;
+
+    public static float SoftCapAttackSpeed(float speed) => Mathf.Clamp(speed, 0.55f, MaxPlayerAttackSpeed);
+    public static float SoftCapAttackRange(float range) => Mathf.Clamp(range, 1.6f, MaxPlayerAttackRange);
+
     // ---- Crafting ----
     /// <summary>
     /// 3 items same slot → 1 upgraded item.
@@ -167,7 +175,21 @@ public static class ProgressionFormulas
             if (a.gemKind != b.gemKind || b.gemKind != c.gemKind) return null;
             return GemCatalog.CreateGem(a.gemKind, newLevel, best);
         }
-        return ItemFactory.Create(a.slot, newLevel, best);
+
+        // Preserve weapon profile tendency (majority vote), average speed/range bonuses.
+        int profile = a.weaponProfile;
+        if (b.weaponProfile == c.weaponProfile) profile = b.weaponProfile;
+        else if (a.weaponProfile == c.weaponProfile) profile = a.weaponProfile;
+        else if (a.weaponProfile == b.weaponProfile) profile = a.weaponProfile;
+
+        var item = ItemFactory.Create(a.slot, newLevel, best, a.slot == ItemSlot.Weapon ? profile : -1);
+        if (item != null && item.slot == ItemSlot.Weapon)
+        {
+            item.attackSpeedBonus = (a.attackSpeedBonus + b.attackSpeedBonus + c.attackSpeedBonus) / 3f * 1.08f;
+            item.attackRangeBonus = (a.attackRangeBonus + b.attackRangeBonus + c.attackRangeBonus) / 3f * 1.08f;
+            item.weaponProfile = profile;
+        }
+        return item;
     }
 
     public static string WorldThemeName(int world)

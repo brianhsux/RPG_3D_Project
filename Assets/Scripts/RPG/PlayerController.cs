@@ -25,8 +25,9 @@ public class PlayerController : MonoBehaviour
         _stats = GetComponent<CharacterStats>();
         _stats.isPlayer = true;
         _stats.displayName = "Hero";
-        _stats.attackRange = 2.6f;
-        _stats.attackCooldown = 0.5f;
+        _stats.attackRange = ProgressionFormulas.PlayerBaseAttackRange;
+        _stats.attackCooldown = ProgressionFormulas.PlayerBaseAttackCooldown;
+        _stats.attackSpeed = 1f;
 
         if (GetComponent<PlayerInventory>() == null)
             gameObject.AddComponent<PlayerInventory>();
@@ -253,8 +254,9 @@ public class PlayerController : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toEnemy), 0.65f);
 
         _stats.MarkAttack();
-        _attackAnimT = 0.28f;
-        if (_bodyAnim != null) _bodyAnim.PlayAttack(0.35f);
+        float anim = Mathf.Clamp(0.32f / Mathf.Max(0.7f, _stats.attackSpeed), 0.16f, 0.35f);
+        _attackAnimT = anim;
+        if (_bodyAnim != null) _bodyAnim.PlayAttack(anim + 0.05f);
         _stats.DealAttack(best);
     }
 
@@ -266,7 +268,7 @@ public class PlayerController : MonoBehaviour
         RPGUI.Ensure();
 
         float panelW = 400f;
-        float panelH = 210f;
+        float panelH = 228f;
         Rect panel = new Rect(16f, 16f, panelW, panelH);
         RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
@@ -274,10 +276,12 @@ public class PlayerController : MonoBehaviour
         string lvText = prog != null ? $"Hero  Lv {prog.level}" : "Hero";
         RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 10f, 220f, RPGUI.LabelH), lvText, RPGUI.Label);
 
-        RPGUI.DrawText(new Rect(panel.x + 220f, panel.y + 14f, 166f, RPGUI.HintH),
+        RPGUI.DrawText(new Rect(panel.x + 220f, panel.y + 10f, 166f, RPGUI.HintH),
             $"ATK {_stats.attackDamage:0}  DEF {_stats.defense:0}", RPGUI.Hint);
+        RPGUI.DrawText(new Rect(panel.x + 220f, panel.y + 28f, 166f, RPGUI.FieldTagH),
+            $"SPD {_stats.attackSpeed:0.00}x  RNG {_stats.attackRange:0.0}", RPGUI.FieldTag);
 
-        float barY = panel.y + 50f;
+        float barY = panel.y + 58f;
         float elem = _stats.fireBonus + _stats.iceBonus + _stats.poisonBonus;
         bool showGems = _stats.critChance > 0.01f || elem > 0.5f || _stats.blockChance > 0.01f
             || _stats.lifesteal > 0.01f || _stats.damageReduction > 0.01f;
@@ -288,8 +292,8 @@ public class PlayerController : MonoBehaviour
             if (_stats.blockChance > 0.01f) extras += $"Block {_stats.blockChance * 100f:0}%  ";
             if (_stats.damageReduction > 0.01f) extras += $"DR {_stats.damageReduction * 100f:0}%  ";
             if (elem > 0.5f) extras += $"Elem +{elem:0}";
-            RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 42f, panelW - 28f, 16f), extras.Trim(), RPGUI.FieldTag);
-            barY = panel.y + 58f;
+            RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 48f, panelW - 28f, 16f), extras.Trim(), RPGUI.FieldTag);
+            barY = panel.y + 66f;
         }
 
         RPGUI.DrawBar(
@@ -382,7 +386,7 @@ public class PlayerController : MonoBehaviour
         RPGUI.DrawText(new Rect(x + 64f, y + 6f, width - 72f, RPGUI.HintH), item.displayName, RPGUI.Hint);
         GUI.color = Color.white;
         string stat = item.slot == ItemSlot.Weapon
-            ? $"Lv{item.itemLevel}  ATK {item.attack:0}"
+            ? $"ATK {item.attack:0}  SPD +{item.attackSpeedBonus * 100f:0}%  RNG +{item.attackRangeBonus:0.0}"
             : $"Lv{item.itemLevel}  DEF {item.defense:0}";
         RPGUI.DrawText(new Rect(x + 64f, y + 34f, width - 72f, RPGUI.FieldTagH), stat, RPGUI.FieldTag);
     }

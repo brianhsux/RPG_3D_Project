@@ -294,6 +294,13 @@ public class PlayerInventory : MonoBehaviour
         _stats.defense = def;
         _stats.maxHealth = hp;
 
+        _stats.attackCooldown = ProgressionFormulas.PlayerBaseAttackCooldown;
+        float weaponSpd = equippedWeapon != null ? equippedWeapon.attackSpeedBonus : 0f;
+        float weaponRng = equippedWeapon != null ? equippedWeapon.attackRangeBonus : 0f;
+        _stats.attackSpeed = ProgressionFormulas.SoftCapAttackSpeed(1f + weaponSpd + gems.attackSpeed);
+        _stats.attackRange = ProgressionFormulas.SoftCapAttackRange(
+            ProgressionFormulas.PlayerBaseAttackRange + weaponRng + gems.attackRange);
+
         _stats.critChance = gems.critChance;
         _stats.critDamageBonus = 0.5f + gems.critDamage;
         _stats.blockChance = gems.blockChance;
@@ -303,7 +310,6 @@ public class PlayerInventory : MonoBehaviour
         _stats.iceBonus = gems.iceDamage;
         _stats.poisonBonus = gems.poisonDamage;
         _stats.lifesteal = gems.lifesteal;
-        _stats.cooldownReduction = gems.cooldownReduction;
 
         if (refillHp || _stats.currentHealth > _stats.maxHealth)
             _stats.currentHealth = _stats.maxHealth;
@@ -442,7 +448,7 @@ public class PlayerInventory : MonoBehaviour
     {
         if (item == null) return float.NegativeInfinity;
         if (item.slot == ItemSlot.Weapon)
-            return item.attack;
+            return item.attack + item.attackSpeedBonus * 18f + item.attackRangeBonus * 8f;
         return item.defense * 2.5f + item.maxHpBonus * 0.12f;
     }
 
@@ -548,7 +554,7 @@ public class PlayerInventory : MonoBehaviour
     {
         result = null;
         // Group bag gems by kind; craft 3 of same kind (lowest levels first).
-        for (int k = 0; k <= 11; k++)
+        for (int k = 0; k < GemCatalog.KindCount; k++)
         {
             var idxs = new List<int>();
             for (int i = 0; i < bag.Count; i++)
@@ -882,6 +888,8 @@ public class PlayerInventory : MonoBehaviour
             "YOUR BUILD (live combat stats)", RPGUI.FieldTag);
 
         string main = $"ATK {atk:0}   DEF {def:0}   HP {hp:0}";
+        if (_stats != null)
+            main += $"   SPD {_stats.attackSpeed:0.00}x   RNG {_stats.attackRange:0.0}";
         if (elem > 0.5f) main += $"   Elemental +{elem:0}";
         RPGUI.DrawText(new Rect(x + 12f, y + 24f, width - 24f, RPGUI.HintH), main, RPGUI.Hint);
 
@@ -931,7 +939,8 @@ public class PlayerInventory : MonoBehaviour
         if (isWeapon)
         {
             RPGUI.DrawText(new Rect(textX, bodyY + 34f, textW, RPGUI.FieldTagH),
-                $"Base ATK {item.attack:0}", RPGUI.FieldTag);
+                $"ATK {item.attack:0} · {ItemFactory.ProfileLabel(item.weaponProfile)} · SPD +{item.attackSpeedBonus * 100f:0}% · RNG +{item.attackRangeBonus:0.0}",
+                RPGUI.FieldTag);
             string gemAtk = gearGems.attackFlat > 0.05f || gearGems.attackPercent > 0.001f
                 || gearGems.fireDamage + gearGems.iceDamage + gearGems.poisonDamage > 0.05f
                 ? GemCatalog.FormatBonusSummary(gearGems)
@@ -1057,7 +1066,7 @@ public class PlayerInventory : MonoBehaviour
                 ? WeaponVisualUtil.StyleLabel(WeaponVisualUtil.StyleIndex(item.itemLevel))
                 : ArmorVisualUtil.StyleLabel(ArmorVisualUtil.StyleIndex(item.itemLevel));
             string stats = item.slot == ItemSlot.Weapon
-                ? $"ATK {item.attack:0}"
+                ? $"ATK {item.attack:0} · {ItemFactory.ProfileLabel(item.weaponProfile)} · SPD +{item.attackSpeedBonus * 100f:0}% · RNG +{item.attackRangeBonus:0.0}"
                 : $"DEF {item.defense:0} · HP +{item.maxHpBonus:0}";
             meta = $"Lv {item.itemLevel} · {styleTag} · {stats}";
         }

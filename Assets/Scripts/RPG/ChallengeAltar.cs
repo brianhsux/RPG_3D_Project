@@ -403,7 +403,7 @@ public class ChallengeAltar : MonoBehaviour
 
         ItemRarity gemRarity = ItemRarity.Legendary;
         var gem = GemCatalog.CreateGem(
-            (GemKind)Random.Range(0, 12),
+            (GemKind)Random.Range(0, GemCatalog.KindCount),
             Mathf.Clamp(content + Random.Range(gemLevelBonus, gemLevelBonus + 3), 1, 50),
             gemRarity);
         bool gemOk = inv != null && inv.AddItem(gem);
@@ -414,7 +414,7 @@ public class ChallengeAltar : MonoBehaviour
         if (_difficulty == Difficulty.Extreme && inv != null)
         {
             gem2 = GemCatalog.CreateGem(
-                (GemKind)Random.Range(0, 12),
+                (GemKind)Random.Range(0, GemCatalog.KindCount),
                 Mathf.Clamp(content + Random.Range(1, 4), 1, 50),
                 Random.value < 0.45f ? ItemRarity.Legendary : ItemRarity.Epic);
             gem2Ok = inv.AddItem(gem2);

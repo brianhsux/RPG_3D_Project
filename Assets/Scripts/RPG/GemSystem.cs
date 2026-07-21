@@ -13,7 +13,8 @@ public enum GemKind
     Aquamarine,     // Ice bonus damage on hit
     Citrine,        // Max HP bonus
     Bloodstone,     // Lifesteal %
-    Obsidian        // Attack cooldown reduction
+    Obsidian,       // Attack speed
+    Quartz          // Attack range
 }
 
 /// <summary>Aggregated bonuses from all socketed gems on equipped gear.</summary>
@@ -33,12 +34,14 @@ public struct GemBonuses
     public float iceDamage;
     public float poisonDamage;
     public float lifesteal;
-    public float cooldownReduction; // 0–0.4
+    public float attackSpeed;     // additive, 0.1 = +10% attack speed
+    public float attackRange;     // meters
 }
 
 public static class GemCatalog
 {
     public const int MaxSockets = 3;
+    public static int KindCount => System.Enum.GetValues(typeof(GemKind)).Length;
 
     public static string KindName(GemKind kind)
     {
@@ -55,7 +58,9 @@ public static class GemCatalog
             case GemKind.Aquamarine: return "Aquamarine";
             case GemKind.Citrine: return "Citrine";
             case GemKind.Bloodstone: return "Bloodstone";
-            default: return "Obsidian";
+            case GemKind.Obsidian: return "Obsidian";
+            case GemKind.Quartz: return "Quartz";
+            default: return "Gem";
         }
     }
 
@@ -74,7 +79,9 @@ public static class GemCatalog
             case GemKind.Aquamarine: return "Ice on hit";
             case GemKind.Citrine: return "Max HP";
             case GemKind.Bloodstone: return "Lifesteal";
-            default: return "Faster attacks";
+            case GemKind.Obsidian: return "Attack speed";
+            case GemKind.Quartz: return "Attack range";
+            default: return "Gem bonus";
         }
     }
 
@@ -93,7 +100,9 @@ public static class GemCatalog
             case GemKind.Aquamarine: return new Color(0.35f, 0.85f, 0.95f);
             case GemKind.Citrine: return new Color(1f, 0.75f, 0.35f);
             case GemKind.Bloodstone: return new Color(0.65f, 0.12f, 0.18f);
-            default: return new Color(0.35f, 0.35f, 0.4f);
+            case GemKind.Obsidian: return new Color(0.35f, 0.35f, 0.4f);
+            case GemKind.Quartz: return new Color(0.92f, 0.9f, 0.85f);
+            default: return Color.white;
         }
     }
 
@@ -175,7 +184,10 @@ public static class GemCatalog
                 b.lifesteal += 0.03f * s;
                 break;
             case GemKind.Obsidian:
-                b.cooldownReduction += 0.04f * s;
+                b.attackSpeed += 0.045f * s;
+                break;
+            case GemKind.Quartz:
+                b.attackRange += 0.14f * s;
                 break;
         }
     }
@@ -202,7 +214,8 @@ public static class GemCatalog
         b.critChance = Mathf.Min(0.55f, b.critChance);
         b.reflectPercent = Mathf.Min(0.6f, b.reflectPercent);
         b.lifesteal = Mathf.Min(0.35f, b.lifesteal);
-        b.cooldownReduction = Mathf.Min(0.4f, b.cooldownReduction);
+        b.attackSpeed = Mathf.Min(0.5f, b.attackSpeed);
+        b.attackRange = Mathf.Min(1.2f, b.attackRange);
         return b;
     }
 
@@ -232,7 +245,8 @@ public static class GemCatalog
         if (b.iceDamage > 0.05f) parts.Add($"Ice +{b.iceDamage:0.#}");
         if (b.poisonDamage > 0.05f) parts.Add($"Poison +{b.poisonDamage:0.#}");
         if (b.lifesteal > 0.001f) parts.Add($"Lifesteal {b.lifesteal * 100f:0.#}%");
-        if (b.cooldownReduction > 0.001f) parts.Add($"AtkSpd +{b.cooldownReduction * 100f:0.#}%");
+        if (b.attackSpeed > 0.001f) parts.Add($"AtkSpd +{b.attackSpeed * 100f:0.#}%");
+        if (b.attackRange > 0.01f) parts.Add($"Range +{b.attackRange:0.00}");
         return parts.Count == 0 ? "No gem bonuses" : string.Join("  ·  ", parts);
     }
 
@@ -260,14 +274,12 @@ public static class GemCatalog
     {
         int lv = Mathf.Clamp(contentLevel + Random.Range(-1, 3), 1, 40);
         var rarity = ProgressionFormulas.RollRarity(contentLevel, contentLevel >= 20);
-        // Slightly favor lower rarities from mining
         if (rarity == ItemRarity.Legendary && Random.value > 0.35f)
             rarity = ItemRarity.Epic;
         if (rarity == ItemRarity.Epic && Random.value > 0.5f)
             rarity = ItemRarity.Rare;
 
-        var kinds = (GemKind[])System.Enum.GetValues(typeof(GemKind));
-        var kind = kinds[Random.Range(0, kinds.Length)];
+        var kind = (GemKind)Random.Range(0, KindCount);
         return CreateGem(kind, lv, rarity);
     }
 
@@ -289,7 +301,9 @@ public static class GemCatalog
             case GemKind.Aquamarine: return $"Ice +{b.iceDamage:0.#}";
             case GemKind.Citrine: return $"HP +{b.maxHpFlat:0}";
             case GemKind.Bloodstone: return $"Lifesteal +{b.lifesteal * 100f:0.#}%";
-            default: return $"Atk Speed +{b.cooldownReduction * 100f:0.#}%";
+            case GemKind.Obsidian: return $"Atk Speed +{b.attackSpeed * 100f:0.#}%";
+            case GemKind.Quartz: return $"Range +{b.attackRange:0.00}";
+            default: return "";
         }
     }
 }

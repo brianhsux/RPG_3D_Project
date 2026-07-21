@@ -10,6 +10,8 @@ public class CharacterStats : MonoBehaviour
     public float defense;
     public float attackRange = 2.2f;
     public float attackCooldown = 0.8f;
+    /// <summary>Attack rate multiplier. 1.0 = base; soft-capped ~1.75 on player.</summary>
+    public float attackSpeed = 1f;
     public bool isPlayer;
     public bool isDead;
 
@@ -23,7 +25,6 @@ public class CharacterStats : MonoBehaviour
     public float iceBonus;
     public float poisonBonus;
     public float lifesteal;
-    public float cooldownReduction;
 
     public int contentLevel = 1;
     public bool isBoss;
@@ -75,12 +76,21 @@ public class CharacterStats : MonoBehaviour
         displayName = ProgressionFormulas.MobDisplayName(contentLevel, isBoss, kind);
         attackRange = isBoss ? 2.8f : 2.0f;
         attackCooldown = isBoss ? 1.15f : 0.95f;
+        attackSpeed = isBoss ? 0.9f : 1f;
+    }
+
+    public float EffectiveAttackCooldown
+    {
+        get
+        {
+            float spd = Mathf.Max(0.5f, attackSpeed);
+            return attackCooldown / spd;
+        }
     }
 
     public bool CanAttack()
     {
-        float cd = attackCooldown * (1f - Mathf.Clamp01(cooldownReduction));
-        return !isDead && Time.time >= _lastAttackTime + cd;
+        return !isDead && Time.time >= _lastAttackTime + EffectiveAttackCooldown;
     }
 
     public void MarkAttack()

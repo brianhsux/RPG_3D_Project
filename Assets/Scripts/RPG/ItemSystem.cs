@@ -13,6 +13,13 @@ public class ItemInstance
     public float defense;
     public float maxHpBonus;
 
+    /// <summary>Weapon: additive attack-speed bonus (0.15 = +15%).</summary>
+    public float attackSpeedBonus;
+    /// <summary>Weapon: flat attack-range bonus in meters.</summary>
+    public float attackRangeBonus;
+    /// <summary>0 Balanced · 1 Swift · 2 Reach</summary>
+    public int weaponProfile;
+
     // Gems
     public GemKind gemKind;
     // Gear sockets (size GemCatalog.MaxSockets; first socketCount are usable)
@@ -26,7 +33,12 @@ public class ItemInstance
             if (slot == ItemSlot.Gem)
                 return $"{RarityColorTag}{displayName}</color>  Lv{itemLevel}  {GemCatalog.EffectLabel(gemKind)}";
             if (slot == ItemSlot.Weapon)
-                return $"{RarityColorTag}{displayName}</color>  Lv{itemLevel}  ATK {attack:0}";
+            {
+                string extra = "";
+                if (attackSpeedBonus > 0.01f) extra += $"  SPD +{attackSpeedBonus * 100f:0}%";
+                if (attackRangeBonus > 0.01f) extra += $"  RNG +{attackRangeBonus:0.0}";
+                return $"{RarityColorTag}{displayName}</color>  Lv{itemLevel}  ATK {attack:0}{extra}";
+            }
             return $"{RarityColorTag}{displayName}</color>  Lv{itemLevel}  DEF {defense:0}  HP+{maxHpBonus:0}";
         }
     }
@@ -65,9 +77,23 @@ public class ItemInstance
 
 public static class ItemFactory
 {
+    public const int ProfileBalanced = 0;
+    public const int ProfileSwift = 1;
+    public const int ProfileReach = 2;
+
     static readonly string[] WeaponNames =
     {
         "Wood Sword", "Iron Sword", "Wind Blade", "Bone Blade", "Flame Slash", "Frost Blade", "Thunder Sword", "Void Blade"
+    };
+
+    static readonly string[] SwiftNames =
+    {
+        "Wood Dagger", "Iron Dirk", "Wind Needle", "Bone Knife", "Flame Fang", "Frost Needle", "Thunder Claw", "Void Fang"
+    };
+
+    static readonly string[] ReachNames =
+    {
+        "Wood Spear", "Iron Pike", "Wind Lance", "Bone Halberd", "Flame Spear", "Frost Pike", "Thunder Lance", "Void Glaive"
     };
 
     static readonly string[] ArmorNames =
@@ -87,7 +113,23 @@ public static class ItemFactory
         }
     }
 
+    public static string ProfileLabel(int profile)
+    {
+        switch (profile)
+        {
+            case ProfileSwift: return "Swift";
+            case ProfileReach: return "Reach";
+            default: return "Balanced";
+        }
+    }
+
     public static ItemInstance Create(ItemSlot slot, int itemLevel, ItemRarity rarity)
+    {
+        return Create(slot, itemLevel, rarity, -1);
+    }
+
+    /// <param name="forcedProfile">-1 random; 0 Balanced; 1 Swift; 2 Reach (weapons only).</param>
+    public static ItemInstance Create(ItemSlot slot, int itemLevel, ItemRarity rarity, int forcedProfile)
     {
         itemLevel = Mathf.Clamp(itemLevel, 1, 40);
         var item = new ItemInstance
@@ -101,10 +143,10 @@ public static class ItemFactory
         int nameIndex = Mathf.Clamp((itemLevel - 1) / 5, 0, 7);
         if (slot == ItemSlot.Weapon)
         {
-            item.displayName = $"{RarityName(rarity)}·{WeaponNames[nameIndex]}";
-            item.attack = ProgressionFormulas.WeaponAttack(itemLevel, rarity);
-            item.defense = 0f;
-            item.maxHpBonus = 0f;
+            int profile = forcedProfile >= 0 && forcedProfile <= 2
+                ? forcedProfile
+                : (Random.value < 0.34f ? ProfileSwift : (Random.value < 0.5f ? ProfileReach : ProfileBalanced));
+            ApplyWeaponProfile(item, profile, nameIndex);
         }
         else if (slot == ItemSlot.Armor)
         {
@@ -118,6 +160,41 @@ public static class ItemFactory
         return item;
     }
 
+    static void ApplyWeaponProfile(ItemInstance item, int profile, int nameIndex)
+    {
+        item.weaponProfile = profile;
+        float atk = ProgressionFormulas.WeaponAttack(item.itemLevel, item.rarity);
+        float spd;
+        float rng;
+        string[] names;
+        switch (profile)
+        {
+            case ProfileSwift:
+                names = SwiftNames;
+                spd = 0.10f + item.itemLevel * 0.008f + (int)item.rarity * 0.035f;
+                rng = -0.05f + (int)item.rarity * 0.02f;
+                atk *= 0.92f;
+                break;
+            case ProfileReach:
+                names = ReachNames;
+                spd = -0.04f + (int)item.rarity * 0.01f;
+                rng = 0.30f + item.itemLevel * 0.022f + (int)item.rarity * 0.08f;
+                atk *= 0.96f;
+                break;
+            default:
+                names = WeaponNames;
+                spd = 0.02f + (int)item.rarity * 0.015f;
+                rng = 0.08f + item.itemLevel * 0.008f + (int)item.rarity * 0.03f;
+                break;
+        }
+        item.displayName = $"{RarityName(item.rarity)}·{names[nameIndex]}";
+        item.attack = atk;
+        item.attackSpeedBonus = spd;
+        item.attackRangeBonus = rng;
+        item.defense = 0f;
+        item.maxHpBonus = 0f;
+    }
+
     public static ItemInstance RollDrop(int contentLevel, bool fromBoss)
     {
         var slot = Random.value < 0.55f ? ItemSlot.Weapon : ItemSlot.Armor;
@@ -128,7 +205,7 @@ public static class ItemFactory
 
     public static ItemInstance StarterWeapon()
     {
-        return Create(ItemSlot.Weapon, 1, ItemRarity.Common);
+        return Create(ItemSlot.Weapon, 1, ItemRarity.Common, ProfileBalanced);
     }
 
     public static ItemInstance StarterArmor()

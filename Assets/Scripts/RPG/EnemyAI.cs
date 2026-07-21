@@ -137,6 +137,10 @@ public class EnemyAI : MonoBehaviour
             if (_bodyAnim != null) _bodyAnim.SetMoveAmount(0f);
             return;
         }
+        // Die() disables CharacterController; never Move while inactive.
+        if (_controller == null || !_controller.enabled)
+            return;
+
         if (_player == null)
         {
             var p = GameObject.FindGameObjectWithTag("Player");
@@ -187,11 +191,17 @@ public class EnemyAI : MonoBehaviour
                 var playerStats = _player.GetComponent<CharacterStats>();
                 if (playerStats != null)
                     playerStats.TakeDamage(_stats.attackDamage, _stats);
+                // Reflect / on-hit can kill this enemy mid-Update and disable the controller.
+                if (_stats.isDead || !_controller.enabled)
+                    return;
             }
         }
 
         if (_bodyAnim != null)
             _bodyAnim.SetMoveAmount(_wasMoving ? 1f : 0f);
+
+        if (!_controller.enabled)
+            return;
 
         if (_controller.isGrounded && _velocity.y < 0f)
             _velocity.y = -2f;
