@@ -4,7 +4,10 @@ using UnityEngine.InputSystem;
 
 public class PlayerInventory : MonoBehaviour
 {
-    public const int MaxBag = 32;
+    /// <summary>Max non-gem items (weapons / armor) in the bag.</summary>
+    public const int MaxGear = 200;
+    /// <summary>Max gems in the bag (separate from gear).</summary>
+    public const int MaxGems = 200;
 
     // Must not be Unity-serialized: exiting Play Mode restores scene defaults
     // (empty items) and was overwriting save files on quit.
@@ -61,12 +64,23 @@ public class PlayerInventory : MonoBehaviour
 
         if (data.bag != null)
         {
+            int gems = 0;
+            int gear = 0;
             foreach (var entry in data.bag)
             {
                 if (entry == null) continue;
                 var item = entry.ToItem();
                 if (item == null) continue;
-                if (bag.Count >= MaxBag) break;
+                if (item.slot == ItemSlot.Gem)
+                {
+                    if (gems >= MaxGems) continue;
+                    gems++;
+                }
+                else
+                {
+                    if (gear >= MaxGear) continue;
+                    gear++;
+                }
                 bag.Add(item);
             }
         }
@@ -97,12 +111,42 @@ public class PlayerInventory : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
+    public int CountGemsInBag()
+    {
+        int n = 0;
+        if (bag == null) return 0;
+        for (int i = 0; i < bag.Count; i++)
+        {
+            if (bag[i] != null && bag[i].slot == ItemSlot.Gem) n++;
+        }
+        return n;
+    }
+
+    public int CountGearInBag()
+    {
+        int n = 0;
+        if (bag == null) return 0;
+        for (int i = 0; i < bag.Count; i++)
+        {
+            if (bag[i] != null && bag[i].slot != ItemSlot.Gem) n++;
+        }
+        return n;
+    }
+
+    public bool CanAddItem(ItemInstance item)
+    {
+        if (item == null) return false;
+        if (item.slot == ItemSlot.Gem)
+            return CountGemsInBag() < MaxGems;
+        return CountGearInBag() < MaxGear;
+    }
+
     public bool AddItem(ItemInstance item)
     {
         if (item == null) return false;
-        if (bag.Count >= MaxBag)
+        if (!CanAddItem(item))
         {
-            ShowLoot("Bag full!");
+            ShowLoot(item.slot == ItemSlot.Gem ? "Gem bag full!" : "Gear bag full!");
             return false;
         }
         bag.Add(item);
@@ -209,9 +253,9 @@ public class PlayerInventory : MonoBehaviour
         if (socketIndex < 0 || socketIndex >= gear.sockets.Length) return;
         var gem = gear.sockets[socketIndex];
         if (gem == null) return;
-        if (bag.Count >= MaxBag)
+        if (CountGemsInBag() >= MaxGems)
         {
-            ShowLoot("Bag full — cannot unsocket");
+            ShowLoot("Gem bag full — cannot unsocket");
             return;
         }
         gear.sockets[socketIndex] = null;
@@ -270,20 +314,24 @@ public class PlayerInventory : MonoBehaviour
     /// <summary>
     /// Equip the strongest weapon and armor from bag + currently equipped.
     /// Weapon ranked by attack; armor by defense + HP bonus.
+    /// Gems on currently worn gear move onto the new pieces when possible.
     /// </summary>
     public int EquipBest()
     {
         int changed = 0;
         string weaponMsg = null;
         string armorMsg = null;
+        int gemsMoved = 0;
 
         int bestWeaponIdx = FindBestBagIndex(ItemSlot.Weapon, equippedWeapon);
         if (bestWeaponIdx >= 0)
         {
             var item = bag[bestWeaponIdx];
             bag.RemoveAt(bestWeaponIdx);
-            if (equippedWeapon != null) bag.Add(equippedWeapon);
+            var old = equippedWeapon;
             equippedWeapon = item;
+            gemsMoved += TransferGemsToNewGear(old, equippedWeapon);
+            if (old != null) bag.Add(old);
             weaponMsg = item.displayName;
             changed++;
         }
@@ -293,8 +341,10 @@ public class PlayerInventory : MonoBehaviour
         {
             var item = bag[bestArmorIdx];
             bag.RemoveAt(bestArmorIdx);
-            if (equippedArmor != null) bag.Add(equippedArmor);
+            var old = equippedArmor;
             equippedArmor = item;
+            gemsMoved += TransferGemsToNewGear(old, equippedArmor);
+            if (old != null) bag.Add(old);
             armorMsg = item.displayName;
             changed++;
         }
@@ -302,12 +352,13 @@ public class PlayerInventory : MonoBehaviour
         if (changed > 0)
         {
             ApplyEquipmentStats(false);
+            string gemNote = gemsMoved > 0 ? $" · moved {gemsMoved} gem{(gemsMoved > 1 ? "s" : "")}" : "";
             if (weaponMsg != null && armorMsg != null)
-                ShowLoot($"Equip Best: Weapon {weaponMsg}, Armor {armorMsg}");
+                ShowLoot($"Equip Best: Weapon {weaponMsg}, Armor {armorMsg}{gemNote}");
             else if (weaponMsg != null)
-                ShowLoot($"Equip Best: Weapon {weaponMsg}");
+                ShowLoot($"Equip Best: Weapon {weaponMsg}{gemNote}");
             else
-                ShowLoot($"Equip Best: Armor {armorMsg}");
+                ShowLoot($"Equip Best: Armor {armorMsg}{gemNote}");
             if (AccountManager.Instance != null)
                 AccountManager.Instance.SaveActive(silent: true);
         }
@@ -315,6 +366,46 @@ public class PlayerInventory : MonoBehaviour
             ShowLoot("Already wearing best gear");
 
         return changed;
+    }
+
+    /// <summary>
+    /// Move socketed gems from old gear onto empty sockets on new gear.
+    /// Leftovers that do not fit stay on the old piece (which returns to the bag).
+    /// Returns how many gems were moved onto the new piece.
+    /// </summary>
+    static int TransferGemsToNewGear(ItemInstance fromOld, ItemInstance toNew)
+    {
+        if (fromOld == null || toNew == null) return 0;
+        GemCatalog.EnsureSockets(fromOld);
+        GemCatalog.EnsureSockets(toNew);
+        if (fromOld.sockets == null || toNew.sockets == null) return 0;
+
+        var moving = new System.Collections.Generic.List<ItemInstance>(GemCatalog.MaxSockets);
+        for (int i = 0; i < fromOld.socketCount && i < fromOld.sockets.Length; i++)
+        {
+            if (fromOld.sockets[i] == null) continue;
+            moving.Add(fromOld.sockets[i]);
+            fromOld.sockets[i] = null;
+        }
+        if (moving.Count == 0) return 0;
+
+        int moved = 0;
+        int mi = 0;
+        for (int i = 0; i < toNew.socketCount && i < toNew.sockets.Length && mi < moving.Count; i++)
+        {
+            if (toNew.sockets[i] != null) continue;
+            toNew.sockets[i] = moving[mi++];
+            moved++;
+        }
+
+        // Put leftovers back on the old gear so they travel with it into the bag.
+        for (int i = 0; i < fromOld.socketCount && i < fromOld.sockets.Length && mi < moving.Count; i++)
+        {
+            if (fromOld.sockets[i] != null) continue;
+            fromOld.sockets[i] = moving[mi++];
+        }
+
+        return moved;
     }
 
     /// <summary>Bag index of an item better than <paramref name="current"/>, or -1.</summary>
@@ -612,11 +703,11 @@ public class PlayerInventory : MonoBehaviour
         int upgradeCount = CountUpgradesInBag();
         string bagHint;
         if (_bagTab == 1)
-            bagHint = $"Gems {gemCount}  |  Select a gem, then click an empty socket on equipped gear";
+            bagHint = $"Gems {gemCount}/{MaxGems}  |  Select a gem, then click an empty socket on equipped gear";
         else if (_bagTab == 2)
             bagHint = $"Pets {petCount}/{PlayerPetController.MaxPets}  |  Deploy one combat pet  |  Bosses can drop/upgrade pets";
         else
-            bagHint = $"Gear {gearCount}  |  {upgradeCount} upgrade(s)  |  Equip from list";
+            bagHint = $"Gear {gearCount}/{MaxGear}  |  {upgradeCount} upgrade(s)  |  Equip from list";
         RPGUI.DrawText(new Rect(panel.x + pad, y, w - pad * 2f, RPGUI.HintH), bagHint, RPGUI.Hint);
         y += RPGUI.HintH + 6f;
 

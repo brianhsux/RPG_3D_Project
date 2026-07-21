@@ -337,9 +337,13 @@ public class PlayerController : MonoBehaviour
         {
             Rect tip = new Rect(Screen.width * 0.5f - 300f, Screen.height * 0.72f, 600f, 40f);
             RPGUI.DrawPanel(tip, new Color(0.22f, 0.1f, 0.06f, 0.92f));
-            string msg = nearAltar.StatusText.StartsWith("Cooldown") || nearAltar.StatusText.StartsWith("Failed") || nearAltar.StatusText.StartsWith("Cleared")
-                ? nearAltar.StatusText
-                : "Press E — Timed Challenge (pet egg / legendary gem)";
+            string msg;
+            if (nearAltar.IsSelecting)
+                msg = "Choose a difficulty (Esc to cancel)";
+            else if (nearAltar.StatusText.StartsWith("Cooldown") || nearAltar.StatusText.StartsWith("Failed") || nearAltar.StatusText.StartsWith("Cleared"))
+                msg = nearAltar.StatusText;
+            else
+                msg = "Press E — Timed Challenge (pick difficulty)";
             RPGUI.DrawText(tip, msg, RPGUI.Hint);
         }
         else

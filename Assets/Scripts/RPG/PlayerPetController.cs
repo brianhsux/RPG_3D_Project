@@ -9,7 +9,7 @@ public class PlayerPetController : MonoBehaviour
 {
     public static PlayerPetController Instance { get; private set; }
 
-    public const int MaxPets = 8;
+    public const int MaxPets = 16;
 
     [System.NonSerialized] public List<PetInstance> owned = new List<PetInstance>();
     [System.NonSerialized] public string activePetId;
