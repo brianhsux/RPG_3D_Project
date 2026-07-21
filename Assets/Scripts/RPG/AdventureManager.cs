@@ -293,7 +293,7 @@ public class AdventureManager : MonoBehaviour
             if (PlayerInventory.Instance != null)
             {
                 string msg = map == 4
-                    ? "World Boss defeated! Portal opened"
+                    ? "World Boss defeated! Next-world portal opened"
                     : $"Map {map} Boss defeated!";
                 PlayerInventory.Instance.ShowLoot(msg);
             }
@@ -309,10 +309,9 @@ public class AdventureManager : MonoBehaviour
         int next = currentWorld + 1;
         if (next > ProgressionFormulas.WorldCount) return;
         highestWorldUnlocked = Mathf.Max(highestWorldUnlocked, next);
-        // Unlock next world, then send the player home so they pick the new gate.
-        LoadVillage(showBanner: false);
+        LoadWorld(next, 1);
         if (PlayerInventory.Instance != null)
-            PlayerInventory.Instance.ShowLoot($"{ProgressionFormulas.WorldThemeName(next)} portal unlocked!");
+            PlayerInventory.Instance.ShowLoot($"Entered {ProgressionFormulas.WorldThemeName(next)}!");
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
     }
@@ -374,11 +373,11 @@ public class AdventureManager : MonoBehaviour
         RPGUI.DrawMapDots(new Rect(x, y, 160f, 22f), currentMap, 4, IsBossCleared(currentWorld, 4));
         string bossText = currentMap == 4
             ? (mapBossDefeated ? "Boss defeated" : "Boss not defeated")
-            : "Normal mobs ×4";
+            : "Explore unique zone routes";
         RPGUI.DrawText(new Rect(x + 170f, y - 2f, textW - 170f, RPGUI.HintH), bossText, RPGUI.Hint);
         y += 28f;
 
-        string tipText = "1–4 travel · Green gate → Village · Hub challenge altar (E)";
+        string tipText = "1–4 travel · Hub gate → Village · Boss gate → next world";
         if (currentMap == 3) tipText = "1–4 travel · Map 3 has crystal mines (E)";
         RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH), tipText, RPGUI.FieldTag);
 
@@ -386,7 +385,7 @@ public class AdventureManager : MonoBehaviour
         {
             Rect tip = new Rect(Screen.width * 0.5f - 380f, 16f, 760f, RPGUI.BannerH);
             RPGUI.DrawPanel(tip, new Color(0.22f, 0.12f, 0.38f, 0.94f));
-            RPGUI.DrawText(tip, "Next-world portal open — walk in to unlock it in the Village", RPGUI.Banner);
+            RPGUI.DrawText(tip, "Boss portal open — walk through to enter the next world", RPGUI.Banner);
         }
 
         if (currentWorld == ProgressionFormulas.WorldCount && IsBossCleared(ProgressionFormulas.WorldCount, 4))

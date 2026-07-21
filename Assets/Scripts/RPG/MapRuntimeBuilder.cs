@@ -19,6 +19,7 @@ public class MapRuntimeBuilder : MonoBehaviour
     GameObject _villageReturn;
     readonly Vector3[] _zoneCenters = new Vector3[5]; // 1..4
     Vector3 _villageSpawn = new Vector3(0f, 0.5f, 2f);
+    WorldLayoutProfiles.Layout _layout;
 
     void Awake()
     {
@@ -28,11 +29,7 @@ public class MapRuntimeBuilder : MonoBehaviour
         else if (VisualPrefabCatalog.Active == null)
             VisualPrefabCatalog.Get();
 
-        // Four scenic zones inside the big square
-        _zoneCenters[1] = new Vector3(-24f, 0f, 0f);   // West  - Map1
-        _zoneCenters[2] = new Vector3(24f, 0f, 0f);    // East  - Map2
-        _zoneCenters[3] = new Vector3(0f, 0f, 24f);    // North - Map3
-        _zoneCenters[4] = new Vector3(0f, 0f, -22f);   // South - Map4 Boss
+        ApplyLayout(WorldLayoutProfiles.ForWorld(1));
     }
 
     VisualPrefabCatalog Cat => catalog != null ? catalog : VisualPrefabCatalog.Get();
@@ -40,6 +37,13 @@ public class MapRuntimeBuilder : MonoBehaviour
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
+    }
+
+    void ApplyLayout(WorldLayoutProfiles.Layout layout)
+    {
+        _layout = layout ?? WorldLayoutProfiles.ForWorld(1);
+        for (int i = 1; i <= 4; i++)
+            _zoneCenters[i] = _layout.zoneCenters[i];
     }
 
     public Vector3 GetTileCenter(int map)
@@ -51,8 +55,8 @@ public class MapRuntimeBuilder : MonoBehaviour
     public Vector3 GetTileSpawn(int map)
     {
         map = Mathf.Clamp(map, 1, 4);
-        // Spawn slightly south of zone center, on solid ground
-        return _zoneCenters[map] + new Vector3(0f, 0.5f, -4f);
+        Vector3 offset = _layout != null ? _layout.spawnOffsets[map] : new Vector3(0f, 0.5f, -4f);
+        return _zoneCenters[map] + offset;
     }
 
     public Vector3 GetVillageSpawn() => _villageSpawn;
@@ -70,6 +74,10 @@ public class MapRuntimeBuilder : MonoBehaviour
 
         int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
         if (world < 1) world = 1;
+
+        ApplyLayout(WorldLayoutProfiles.ForWorld(world));
+        // Stable prop scatter per world rebuild
+        Random.InitState(world * 9176 + 41);
 
         BuildBigArena(world);
 
@@ -183,8 +191,8 @@ public class MapRuntimeBuilder : MonoBehaviour
     {
         if (_root == null || _villageReturn != null) return;
 
-        // Off the hub crossroads so walking between zones doesn't accidental-home.
-        Vector3 pos = new Vector3(-8f, 0f, -8f);
+        // Always at the hub center — the middle door back to the Village.
+        Vector3 pos = _layout != null ? _layout.hub : Vector3.zero;
         var mat = MakeTempMat(new Color(0.35f, 0.75f, 0.45f));
         var frame = MakeTempMat(new Color(0.5f, 0.42f, 0.28f));
         Prim(PrimitiveType.Cube, "VillageGateFrame", pos + new Vector3(0f, 1.5f, 0f), new Vector3(2.6f, 3f, 0.35f), frame);
@@ -315,6 +323,7 @@ public class MapRuntimeBuilder : MonoBehaviour
         var groundMat = MakeTempMat(ThemeGround(world));
         var wallMat = MakeTempMat(ThemeWall(world));
         var pathMat = MakeTempMat(ThemePath(world));
+        var blockMat = MakeTempMat(Color.Lerp(ThemeWall(world), ThemeBossAccent(world), 0.25f));
 
         float half = WorldSize * 0.5f;
         float wh = 3f;
@@ -326,11 +335,38 @@ public class MapRuntimeBuilder : MonoBehaviour
         Prim(PrimitiveType.Cube, "Wall_E", new Vector3(half, wh / 2f, 0f), new Vector3(0.8f, wh, WorldSize), wallMat);
         Prim(PrimitiveType.Cube, "Wall_W", new Vector3(-half, wh / 2f, 0f), new Vector3(0.8f, wh, WorldSize), wallMat);
 
-        Prim(PrimitiveType.Cube, "Path_W", new Vector3(-12f, 0.03f, 0f), new Vector3(14f, 0.06f, 4f), pathMat);
-        Prim(PrimitiveType.Cube, "Path_E", new Vector3(12f, 0.03f, 0f), new Vector3(14f, 0.06f, 4f), pathMat);
-        Prim(PrimitiveType.Cube, "Path_N", new Vector3(0f, 0.03f, 12f), new Vector3(4f, 0.06f, 14f), pathMat);
-        Prim(PrimitiveType.Cube, "Path_S", new Vector3(0f, 0.03f, -11f), new Vector3(4f, 0.06f, 12f), pathMat);
-        Prim(PrimitiveType.Cylinder, "Hub", new Vector3(0f, 0.04f, 0f), new Vector3(8f, 0.05f, 8f), pathMat);
+        Vector3 hub = _layout != null ? _layout.hub : Vector3.zero;
+        float hubScale = _layout != null ? _layout.hubScale : 8f;
+        Prim(PrimitiveType.Cylinder, "Hub", hub + new Vector3(0f, 0.04f, 0f), new Vector3(hubScale, 0.05f, hubScale), pathMat);
+
+        if (_layout != null && _layout.paths != null)
+        {
+            for (int i = 0; i < _layout.paths.Length; i++)
+            {
+                var seg = _layout.paths[i];
+                var go = Prim(PrimitiveType.Cube, "Path_" + i, seg.pos, seg.scale, pathMat);
+                if (Mathf.Abs(seg.yawY) > 0.01f)
+                    go.transform.rotation = Quaternion.Euler(0f, seg.yawY, 0f);
+            }
+        }
+        else
+        {
+            Prim(PrimitiveType.Cube, "Path_W", new Vector3(-12f, 0.03f, 0f), new Vector3(14f, 0.06f, 4f), pathMat);
+            Prim(PrimitiveType.Cube, "Path_E", new Vector3(12f, 0.03f, 0f), new Vector3(14f, 0.06f, 4f), pathMat);
+            Prim(PrimitiveType.Cube, "Path_N", new Vector3(0f, 0.03f, 12f), new Vector3(4f, 0.06f, 14f), pathMat);
+            Prim(PrimitiveType.Cube, "Path_S", new Vector3(0f, 0.03f, -11f), new Vector3(4f, 0.06f, 12f), pathMat);
+        }
+
+        if (_layout != null && _layout.blockers != null)
+        {
+            for (int i = 0; i < _layout.blockers.Length; i++)
+            {
+                var b = _layout.blockers[i];
+                var go = Prim(PrimitiveType.Cube, "RouteBlock_" + i, b.pos, b.scale, blockMat);
+                if (Mathf.Abs(b.yawY) > 0.01f)
+                    go.transform.rotation = Quaternion.Euler(0f, b.yawY, 0f);
+            }
+        }
 
         float p = half - 2f;
         BuildCornerLandmark(world, new Vector3(p, 0f, p), "PillarNE");
@@ -386,7 +422,12 @@ public class MapRuntimeBuilder : MonoBehaviour
         var zoneRoot = new GameObject($"Zone_Map{map}").transform;
         zoneRoot.SetParent(_root, false);
 
-        float zoneSize = map == 4 ? 20f : 18f;
+        float zoneSize = 18f;
+        if (_layout != null && map >= 1 && map < _layout.zoneSizes.Length)
+            zoneSize = _layout.zoneSizes[map];
+        else if (map == 4)
+            zoneSize = 20f;
+
         var floorMat = MakeTempMat(ZoneFloor(world, map));
         Prim(PrimitiveType.Cube, "ZoneFloor", center + new Vector3(0f, 0.02f, 0f), new Vector3(zoneSize, 0.05f, zoneSize), floorMat, zoneRoot);
 
@@ -892,10 +933,10 @@ public class MapRuntimeBuilder : MonoBehaviour
         ore.Configure(level, "Crystal Vein", tint);
     }
 
-    /// <summary>Open hub arena (NE of crossroads) — away from crowded map zones.</summary>
+    /// <summary>Open hub arena — position comes from each world's layout profile.</summary>
     void SpawnChallengeAltar(Transform parent, int world)
     {
-        Vector3 pos = new Vector3(10f, 0f, 10f);
+        Vector3 pos = _layout != null ? _layout.altarPos : new Vector3(10f, 0f, 10f);
         var root = new GameObject("ChallengeAltar");
         root.transform.SetParent(parent, false);
         root.transform.position = pos;
@@ -941,25 +982,37 @@ public class MapRuntimeBuilder : MonoBehaviour
     {
         int level = ProgressionFormulas.ContentLevel(world, map);
 
-        // Map 4: boss only. Maps 1-3: exactly 4 of one monster type.
+        // Map 4: boss only.
         if (map == 4)
         {
-            CreateEnemy(parent, $"M{map}_Boss", center + new Vector3(0f, 0f, 3f), center, level, true, EnemyKind.WorldBoss, map);
+            Vector3 bossOff = new Vector3(0f, 0f, 3f);
+            CreateEnemy(parent, $"M{map}_Boss", center + bossOff, center, level, true, EnemyKind.WorldBoss, map);
             return;
         }
 
         EnemyKind kind = EnemyVisuals.KindForZone(world, map);
 
-        Vector3[] localSpots =
+        int count = 4;
+        var pattern = WorldLayoutProfiles.SpawnPattern.Diamond;
+        if (_layout != null)
         {
-            new Vector3(-4f, 0f, 2f),
-            new Vector3(4f, 0f, 2f),
-            new Vector3(-3f, 0f, -3f),
-            new Vector3(3f, 0f, -3f)
-        };
+            if (map < _layout.mobCounts.Length)
+                count = Mathf.Clamp(_layout.mobCounts[map], 2, 6);
+            if (map < _layout.spawnPatterns.Length)
+                pattern = _layout.spawnPatterns[map];
+        }
 
-        for (int i = 0; i < 4; i++)
-            CreateEnemy(parent, $"M{map}_Mob{i}_{kind}", center + localSpots[i], center, level, false, kind, map);
+        Vector3[] localSpots = WorldLayoutProfiles.MobLocalSpots(pattern, count);
+        float leashMul = _layout != null ? _layout.leashMul : 1f;
+
+        for (int i = 0; i < count; i++)
+        {
+            var go = CreateEnemy(parent, $"M{map}_Mob{i}_{kind}", center + localSpots[i], center, level, false, kind, map);
+            if (go == null) continue;
+            var ai = go.GetComponent<EnemyAI>();
+            if (ai != null)
+                ai.leashRadius = 9f * leashMul;
+        }
     }
 
     GameObject CreateEnemy(Transform parent, string name, Vector3 pos, Vector3 zoneCenter, int level, bool isBoss, EnemyKind kind, int mapIndex)
@@ -1055,6 +1108,16 @@ public class MapRuntimeBuilder : MonoBehaviour
         col.isTrigger = true;
         col.radius = 1.8f;
         trigger.AddComponent<WorldPortalTrigger>();
+
+        int next = (AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1) + 1;
+        if (next <= ProgressionFormulas.WorldCount)
+        {
+            var label = trigger.AddComponent<WorldPortalLabel>();
+            label.worldId = next;
+            label.unlocked = true;
+            label.showInAdventure = true;
+            label.customLabel = $"Next World → {ProgressionFormulas.WorldThemeName(next)}";
+        }
 
         var lightGo = new GameObject("PortalLight");
         lightGo.transform.SetParent(trigger.transform, false);

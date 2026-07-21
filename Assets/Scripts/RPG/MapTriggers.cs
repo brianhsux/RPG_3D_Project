@@ -61,21 +61,31 @@ public class VillageReturnTrigger : MonoBehaviour
     }
 }
 
-/// <summary>World-space name tag for village world portals.</summary>
+/// <summary>World-space name tag for village world portals / return / next-world gates.</summary>
 public class WorldPortalLabel : MonoBehaviour
 {
     public int worldId = 1;
     public bool unlocked;
+    /// <summary>If true, also shown while exploring adventure maps (boss next-world portal).</summary>
+    public bool showInAdventure;
+    public string customLabel;
 
     void OnGUI()
     {
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady) return;
         if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
         if (AdventureManager.Instance == null) return;
-        // Show in village (world gates) and in adventure hubs (return gate).
+
         bool inVillage = AdventureManager.Instance.IsInVillage;
-        if (!inVillage && worldId != 0) return;
-        if (inVillage && worldId == 0) return;
+        if (inVillage)
+        {
+            if (worldId == 0) return;
+        }
+        else
+        {
+            // Adventure: hub return (id 0) or explicit next-world label
+            if (worldId != 0 && !showInAdventure) return;
+        }
 
         var cam = Camera.main;
         if (cam == null) return;
@@ -88,15 +98,18 @@ public class WorldPortalLabel : MonoBehaviour
         if (Vector3.Distance(player.transform.position, transform.position) > 18f) return;
 
         RPGUI.Ensure();
-        float w = 220f;
+        float w = 240f;
         float h = 36f;
         Rect r = new Rect(screen.x - w * 0.5f, Screen.height - screen.y - h, w, h);
         Color bg = unlocked
             ? new Color(0.12f, 0.22f, 0.14f, 0.9f)
             : new Color(0.12f, 0.12f, 0.14f, 0.88f);
         RPGUI.DrawPanel(r, bg);
+
         string text;
-        if (worldId == 0)
+        if (!string.IsNullOrEmpty(customLabel))
+            text = customLabel;
+        else if (worldId == 0)
             text = "Return to Village";
         else
         {
