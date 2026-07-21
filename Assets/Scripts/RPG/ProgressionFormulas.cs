@@ -9,6 +9,8 @@ public static class ProgressionFormulas
     public const int WorldCount = 10;
     public const int MapsPerWorld = 4;
     public const int MaxContentLevel = WorldCount * MapsPerWorld;
+    /// <summary>AdventureManager / save use 0 for the Village hub (not an adventure world).</summary>
+    public const int VillageWorldId = 0;
 
     public static int ContentLevel(int world, int map)
     {
@@ -172,6 +174,7 @@ public static class ProgressionFormulas
     {
         switch (world)
         {
+            case 0: return "Village";
             case 1: return "Plains";
             case 2: return "Forest";
             case 3: return "Ruins";
@@ -188,6 +191,7 @@ public static class ProgressionFormulas
 
     public static string MapName(int world, int map)
     {
+        if (world == VillageWorldId) return "Home Village";
         map = Mathf.Clamp(map, 1, MapsPerWorld);
         if (map == 4) return WorldThemeName(world) + " · Boss Sanctum";
 

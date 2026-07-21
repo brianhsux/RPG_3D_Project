@@ -500,8 +500,11 @@ public class AccountManager : MonoBehaviour
 
                 RPGUI.DrawText(new Rect(row.x + 16f, row.y + 8f, row.width - 28f, RPGUI.ItemNameH),
                     a.accountName, RPGUI.ItemName);
+                string worldLabel = a.currentWorld <= 0
+                    ? "Village"
+                    : $"World {a.currentWorld}";
                 RPGUI.DrawText(new Rect(row.x + 16f, row.y + 44f, row.width - 28f, RPGUI.FieldTagH),
-                    $"Lv {a.level} · World {a.currentWorld} · {a.lastPlayedAt}", RPGUI.FieldTag);
+                    $"Lv {a.level} · {worldLabel} · {a.lastPlayedAt}", RPGUI.FieldTag);
 
                 if (Event.current.type == EventType.MouseDown && row.Contains(Event.current.mousePosition))
                 {

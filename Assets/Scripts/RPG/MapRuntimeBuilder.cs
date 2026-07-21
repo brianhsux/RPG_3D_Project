@@ -16,7 +16,9 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     Transform _root;
     GameObject _worldPortal;
+    GameObject _villageReturn;
     readonly Vector3[] _zoneCenters = new Vector3[5]; // 1..4
+    Vector3 _villageSpawn = new Vector3(0f, 0.5f, 2f);
 
     void Awake()
     {
@@ -53,6 +55,8 @@ public class MapRuntimeBuilder : MonoBehaviour
         return _zoneCenters[map] + new Vector3(0f, 0.5f, -4f);
     }
 
+    public Vector3 GetVillageSpawn() => _villageSpawn;
+
     public void BuildCurrentMap() => BuildCurrentWorld();
 
     public void BuildCurrentWorld()
@@ -61,17 +65,150 @@ public class MapRuntimeBuilder : MonoBehaviour
             Destroy(_root.gameObject);
 
         _worldPortal = null;
+        _villageReturn = null;
         _root = new GameObject("RuntimeWorld").transform;
 
         int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
+        if (world < 1) world = 1;
 
         BuildBigArena(world);
 
         for (int map = 1; map <= 4; map++)
             BuildZone(world, map, _zoneCenters[map]);
 
+        SpawnVillageReturnGate();
+
         if (AdventureManager.Instance != null && AdventureManager.Instance.worldPortalReady)
             SpawnWorldPortal();
+    }
+
+    public void BuildVillage()
+    {
+        if (_root != null)
+            Destroy(_root.gameObject);
+
+        _worldPortal = null;
+        _villageReturn = null;
+        _root = new GameObject("RuntimeVillage").transform;
+
+        float size = 56f;
+        float half = size * 0.5f;
+        var ground = MakeTempMat(new Color(0.34f, 0.58f, 0.32f));
+        var wall = MakeTempMat(new Color(0.48f, 0.42f, 0.34f));
+        var path = MakeTempMat(new Color(0.62f, 0.55f, 0.4f));
+        var wood = MakeTempMat(new Color(0.45f, 0.3f, 0.18f));
+        var roof = MakeTempMat(new Color(0.55f, 0.22f, 0.18f));
+        var water = MakeTempMat(new Color(0.25f, 0.55f, 0.85f));
+
+        Prim(PrimitiveType.Cube, "Ground", new Vector3(0f, -0.25f, 0f), new Vector3(size, 0.5f, size), ground);
+        float wh = 2.8f;
+        Prim(PrimitiveType.Cube, "Wall_N", new Vector3(0f, wh * 0.5f, half), new Vector3(size, wh, 0.7f), wall);
+        Prim(PrimitiveType.Cube, "Wall_S", new Vector3(0f, wh * 0.5f, -half), new Vector3(size, wh, 0.7f), wall);
+        Prim(PrimitiveType.Cube, "Wall_E", new Vector3(half, wh * 0.5f, 0f), new Vector3(0.7f, wh, size), wall);
+        Prim(PrimitiveType.Cube, "Wall_W", new Vector3(-half, wh * 0.5f, 0f), new Vector3(0.7f, wh, size), wall);
+
+        Prim(PrimitiveType.Cylinder, "Plaza", new Vector3(0f, 0.04f, 0f), new Vector3(12f, 0.05f, 12f), path);
+        Prim(PrimitiveType.Cylinder, "FountainBase", new Vector3(0f, 0.35f, 0f), new Vector3(2.4f, 0.35f, 2.4f), wall);
+        Prim(PrimitiveType.Cylinder, "FountainWater", new Vector3(0f, 0.85f, 0f), new Vector3(1.6f, 0.4f, 1.6f), water);
+
+        BuildHouse(_root, new Vector3(-10f, 0f, 8f), wood, roof);
+        BuildHouse(_root, new Vector3(10f, 0f, 7f), wood, roof);
+        BuildHouse(_root, new Vector3(-9f, 0f, -9f), wood, roof);
+        BuildHouse(_root, new Vector3(11f, 0f, -8f), wood, roof);
+
+        // Decorative trees around the rim
+        var foliage = MakeTempMat(new Color(0.2f, 0.5f, 0.22f));
+        for (int i = 0; i < 10; i++)
+        {
+            float ang = i / 10f * Mathf.PI * 2f;
+            Vector3 tp = new Vector3(Mathf.Cos(ang) * 22f, 0f, Mathf.Sin(ang) * 22f);
+            Prim(PrimitiveType.Cylinder, "TreeTrunk" + i, tp + Vector3.up * 1.1f, new Vector3(0.45f, 1.1f, 0.45f), wood);
+            Prim(PrimitiveType.Sphere, "TreeTop" + i, tp + Vector3.up * 2.6f, Vector3.one * 2.2f, foliage);
+        }
+
+        _villageSpawn = new Vector3(0f, 0.5f, 2f);
+        SpawnVillageWorldPortals();
+    }
+
+    void SpawnVillageWorldPortals()
+    {
+        int unlocked = AdventureManager.Instance != null
+            ? AdventureManager.Instance.highestWorldUnlocked
+            : 1;
+
+        for (int w = 1; w <= ProgressionFormulas.WorldCount; w++)
+        {
+            float ang = ((w - 1) / (float)ProgressionFormulas.WorldCount) * Mathf.PI * 2f - Mathf.PI * 0.5f;
+            float rad = 16f;
+            Vector3 pos = new Vector3(Mathf.Cos(ang) * rad, 0f, Mathf.Sin(ang) * rad);
+            bool open = w <= unlocked;
+
+            Color accent = open ? Color.Lerp(ThemeGround(w), ThemeBossAccent(w), 0.55f) : new Color(0.22f, 0.22f, 0.24f);
+            var mat = MakeTempMat(accent);
+            var frame = MakeTempMat(open ? new Color(0.55f, 0.48f, 0.35f) : new Color(0.18f, 0.18f, 0.2f));
+
+            Prim(PrimitiveType.Cube, $"GateFrame_W{w}", pos + new Vector3(0f, 1.6f, 0f), new Vector3(0.35f, 3.2f, 2.4f), frame);
+            var gate = Prim(PrimitiveType.Cylinder, $"WorldGate_W{w}", pos + new Vector3(0f, 1.5f, 0f), new Vector3(1.6f, 1.4f, 0.35f), mat);
+            Object.Destroy(gate.GetComponent<Collider>());
+
+            var trigger = new GameObject($"VillagePortal_W{w}");
+            trigger.transform.SetParent(_root, false);
+            trigger.transform.position = pos + new Vector3(0f, 1f, 0f);
+            var col = trigger.AddComponent<SphereCollider>();
+            col.isTrigger = true;
+            col.radius = open ? 1.55f : 1.35f;
+
+            var portal = trigger.AddComponent<VillageWorldPortalTrigger>();
+            portal.targetWorld = w;
+
+            var label = trigger.AddComponent<WorldPortalLabel>();
+            label.worldId = w;
+            label.unlocked = open;
+
+            if (open)
+            {
+                var lightGo = new GameObject("GateLight");
+                lightGo.transform.SetParent(trigger.transform, false);
+                var light = lightGo.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = accent;
+                light.intensity = 3.5f;
+                light.range = 8f;
+            }
+        }
+    }
+
+    void SpawnVillageReturnGate()
+    {
+        if (_root == null || _villageReturn != null) return;
+
+        // Off the hub crossroads so walking between zones doesn't accidental-home.
+        Vector3 pos = new Vector3(-8f, 0f, -8f);
+        var mat = MakeTempMat(new Color(0.35f, 0.75f, 0.45f));
+        var frame = MakeTempMat(new Color(0.5f, 0.42f, 0.28f));
+        Prim(PrimitiveType.Cube, "VillageGateFrame", pos + new Vector3(0f, 1.5f, 0f), new Vector3(2.6f, 3f, 0.35f), frame);
+        _villageReturn = Prim(PrimitiveType.Cylinder, "VillageReturnGate", pos + new Vector3(0f, 1.4f, 0f), new Vector3(2.2f, 1.3f, 0.4f), mat);
+        Object.Destroy(_villageReturn.GetComponent<Collider>());
+
+        var trigger = new GameObject("VillageReturnTrigger");
+        trigger.transform.SetParent(_root, false);
+        trigger.transform.position = pos + new Vector3(0f, 1f, 0f);
+        var col = trigger.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 1.7f;
+        trigger.AddComponent<VillageReturnTrigger>();
+
+        var label = trigger.AddComponent<WorldPortalLabel>();
+        label.worldId = 0;
+        label.unlocked = true;
+
+        var lightGo = new GameObject("VillageGateLight");
+        lightGo.transform.SetParent(trigger.transform, false);
+        var light = lightGo.AddComponent<Light>();
+        light.type = LightType.Point;
+        light.color = new Color(0.4f, 0.9f, 0.5f);
+        light.intensity = 4f;
+        light.range = 10f;
     }
 
     Color ThemeGround(int world)

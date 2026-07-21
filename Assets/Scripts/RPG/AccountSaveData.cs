@@ -119,8 +119,10 @@ public class AccountSaveData
     public int level = 1;
     public int xp;
 
-    public int currentWorld = 1;
+    /// <summary>0 = Village hub; 1–10 = adventure worlds.</summary>
+    public int currentWorld = 0;
     public int currentMap = 1;
+    /// <summary>Highest world the player may enter from the village (visited / unlocked).</summary>
     public int highestWorldUnlocked = 1;
     public int killCount;
     public string[] clearedBossKeys = Array.Empty<string>();
@@ -142,7 +144,8 @@ public class AccountIndexEntry
     public string accountName;
     public string lastPlayedAt;
     public int level = 1;
-    public int currentWorld = 1;
+    /// <summary>0 = Village; 1–10 = adventure world.</summary>
+    public int currentWorld = 0;
 }
 
 [Serializable]

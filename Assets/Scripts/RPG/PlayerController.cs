@@ -199,6 +199,8 @@ public class PlayerController : MonoBehaviour
     {
         if (AdventureManager.Instance != null && MapRuntimeBuilder.Instance != null)
         {
+            if (AdventureManager.Instance.IsInVillage)
+                return MapRuntimeBuilder.Instance.GetVillageSpawn();
             int map = Mathf.Clamp(AdventureManager.Instance.currentMap, 1, 4);
             return MapRuntimeBuilder.Instance.GetTileSpawn(map);
         }
@@ -325,7 +327,10 @@ public class PlayerController : MonoBehaviour
         }
 
         RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 560f, RPGUI.HintH),
-            "WASD move · Space jump · Attack · E interact · 1-4 travel · I bag", RPGUI.Hint);
+            AdventureManager.Instance != null && AdventureManager.Instance.IsInVillage
+                ? "WASD move · Space jump · Walk into portals · I bag"
+                : "WASD move · Space jump · Attack · E interact · 1-4 travel · I bag",
+            RPGUI.Hint);
 
         var nearAltar = ChallengeAltar.FindNearest(transform.position, ChallengeAltar.InteractRange);
         if (nearAltar != null && !nearAltar.IsRunning)

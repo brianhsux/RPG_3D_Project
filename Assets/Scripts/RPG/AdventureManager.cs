@@ -2,14 +2,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 10 worlds × 4 map tiles in a physical layout per world.
-/// Walk between tiles via corridors. Each tile has its own monsters.
+/// Village hub + 10 worlds × 4 map tiles.
+/// Login always starts in the Village. World portals unlock after visiting a world.
 /// </summary>
 public class AdventureManager : MonoBehaviour
 {
     public static AdventureManager Instance { get; private set; }
 
-    public int currentWorld = 1;
+    /// <summary>0 = Village hub; 1–10 = adventure worlds.</summary>
+    public int currentWorld = ProgressionFormulas.VillageWorldId;
     public int currentMap = 1;
     public int highestWorldUnlocked = 1;
 
@@ -18,6 +19,8 @@ public class AdventureManager : MonoBehaviour
     public int killCount;
 
     readonly HashSet<string> _clearedBossKeys = new HashSet<string>();
+
+    public bool IsInVillage => currentWorld == ProgressionFormulas.VillageWorldId;
 
     void Awake()
     {
@@ -45,7 +48,8 @@ public class AdventureManager : MonoBehaviour
     public void BeginAfterAccountReady()
     {
         DisableLegacyWorld();
-        LoadWorld(currentWorld, currentMap);
+        // Always land in the Village on login.
+        LoadVillage(showBanner: false);
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
     }
@@ -54,8 +58,11 @@ public class AdventureManager : MonoBehaviour
     {
         if (data == null) data = new AccountSaveData();
 
-        currentWorld = Mathf.Clamp(data.currentWorld, 1, ProgressionFormulas.WorldCount);
-        currentMap = Mathf.Clamp(data.currentMap, 1, ProgressionFormulas.MapsPerWorld);
+        currentWorld = Mathf.Clamp(data.currentWorld, ProgressionFormulas.VillageWorldId, ProgressionFormulas.WorldCount);
+        if (IsInVillage)
+            currentMap = 1;
+        else
+            currentMap = Mathf.Clamp(data.currentMap, 1, ProgressionFormulas.MapsPerWorld);
         highestWorldUnlocked = Mathf.Clamp(data.highestWorldUnlocked, 1, ProgressionFormulas.WorldCount);
         killCount = Mathf.Max(0, data.killCount);
 
@@ -102,11 +109,61 @@ public class AdventureManager : MonoBehaviour
         }
     }
 
-    public int ContentLevel => ProgressionFormulas.ContentLevel(currentWorld, currentMap);
+    public int ContentLevel => IsInVillage
+        ? 0
+        : ProgressionFormulas.ContentLevel(currentWorld, currentMap);
 
     public string BossKey(int world, int map) => $"W{world}M{map}";
 
     public bool IsBossCleared(int world, int map) => _clearedBossKeys.Contains(BossKey(world, map));
+
+    /// <summary>World portals open for every world the player has reached (visited / unlocked).</summary>
+    public bool HasVisitedWorld(int world)
+    {
+        return world >= 1 && world <= highestWorldUnlocked;
+    }
+
+    public void LoadVillage(bool showBanner = true)
+    {
+        currentWorld = ProgressionFormulas.VillageWorldId;
+        currentMap = 1;
+        mapBossDefeated = false;
+        worldPortalReady = false;
+
+        if (MapRuntimeBuilder.Instance != null)
+            MapRuntimeBuilder.Instance.BuildVillage();
+
+        PlacePlayerAtVillage();
+
+        if (showBanner && PlayerInventory.Instance != null)
+            PlayerInventory.Instance.ShowLoot("Welcome to the Village");
+
+        if (AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
+    }
+
+    public void ReturnToVillage()
+    {
+        if (IsInVillage) return;
+        LoadVillage(showBanner: true);
+    }
+
+    public void EnterWorldFromVillage(int world)
+    {
+        world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
+        if (!HasVisitedWorld(world))
+        {
+            if (PlayerInventory.Instance != null)
+                PlayerInventory.Instance.ShowLoot($"{ProgressionFormulas.WorldThemeName(world)} portal is sealed");
+            return;
+        }
+
+        LoadWorld(world, 1);
+        if (PlayerInventory.Instance != null)
+            PlayerInventory.Instance.ShowLoot($"Entered {ProgressionFormulas.WorldThemeName(world)}");
+        if (AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
+    }
 
     public void LoadWorld(int world, int startMap = 1)
     {
@@ -119,6 +176,9 @@ public class AdventureManager : MonoBehaviour
             return;
         }
 
+        // Entering a world counts as visiting it.
+        highestWorldUnlocked = Mathf.Max(highestWorldUnlocked, world);
+
         currentWorld = world;
         currentMap = startMap;
         RefreshBossFlags();
@@ -127,11 +187,20 @@ public class AdventureManager : MonoBehaviour
             MapRuntimeBuilder.Instance.BuildCurrentWorld();
 
         PlacePlayerInTile(startMap);
+
+        if (AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
     }
 
     public void LoadMap(int world, int map, bool forceRebuild = false)
     {
-        if (world != currentWorld || forceRebuild)
+        if (world == ProgressionFormulas.VillageWorldId)
+        {
+            LoadVillage();
+            return;
+        }
+
+        if (world != currentWorld || forceRebuild || IsInVillage)
             LoadWorld(world, map);
         else
             GoToMap(map);
@@ -139,12 +208,20 @@ public class AdventureManager : MonoBehaviour
 
     void RefreshBossFlags()
     {
+        if (IsInVillage)
+        {
+            mapBossDefeated = false;
+            worldPortalReady = false;
+            return;
+        }
+
         mapBossDefeated = IsBossCleared(currentWorld, currentMap);
         worldPortalReady = IsBossCleared(currentWorld, 4) && currentWorld < ProgressionFormulas.WorldCount;
     }
 
     public void EnterTile(int map)
     {
+        if (IsInVillage) return;
         map = Mathf.Clamp(map, 1, 4);
         if (currentMap == map) return;
         currentMap = map;
@@ -153,6 +230,7 @@ public class AdventureManager : MonoBehaviour
 
     public void GoToMap(int map)
     {
+        if (IsInVillage) return;
         map = Mathf.Clamp(map, 1, 4);
         currentMap = map;
         mapBossDefeated = IsBossCleared(currentWorld, currentMap);
@@ -165,6 +243,18 @@ public class AdventureManager : MonoBehaviour
         if (player == null || MapRuntimeBuilder.Instance == null) return;
 
         Vector3 pos = MapRuntimeBuilder.Instance.GetTileSpawn(map);
+        PlacePlayerAt(player, pos);
+    }
+
+    void PlacePlayerAtVillage()
+    {
+        var player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null || MapRuntimeBuilder.Instance == null) return;
+        PlacePlayerAt(player, MapRuntimeBuilder.Instance.GetVillageSpawn());
+    }
+
+    static void PlacePlayerAt(GameObject player, Vector3 pos)
+    {
         var stats = player.GetComponent<CharacterStats>();
         var cc = player.GetComponent<CharacterController>();
         if (cc != null) cc.enabled = false;
@@ -215,13 +305,14 @@ public class AdventureManager : MonoBehaviour
 
     public void EnterNextWorld()
     {
-        if (!worldPortalReady) return;
+        if (!worldPortalReady || IsInVillage) return;
         int next = currentWorld + 1;
         if (next > ProgressionFormulas.WorldCount) return;
         highestWorldUnlocked = Mathf.Max(highestWorldUnlocked, next);
-        LoadWorld(next, 1);
+        // Unlock next world, then send the player home so they pick the new gate.
+        LoadVillage(showBanner: false);
         if (PlayerInventory.Instance != null)
-            PlayerInventory.Instance.ShowLoot($"Entered {ProgressionFormulas.WorldThemeName(next)}!");
+            PlayerInventory.Instance.ShowLoot($"{ProgressionFormulas.WorldThemeName(next)} portal unlocked!");
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
     }
@@ -229,10 +320,10 @@ public class AdventureManager : MonoBehaviour
     void Update()
     {
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady) return;
+        if (IsInVillage) return;
 
         var kb = UnityEngine.InputSystem.Keyboard.current;
         if (kb == null) return;
-        // Convenience: teleport to a tile (still physically separate rooms)
         if (kb.digit1Key.wasPressedThisFrame || kb.numpad1Key.wasPressedThisFrame) GoToMap(1);
         if (kb.digit2Key.wasPressedThisFrame || kb.numpad2Key.wasPressedThisFrame) GoToMap(2);
         if (kb.digit3Key.wasPressedThisFrame || kb.numpad3Key.wasPressedThisFrame) GoToMap(3);
@@ -247,13 +338,29 @@ public class AdventureManager : MonoBehaviour
         RPGUI.Ensure();
 
         float panelW = 380f;
-        float panelH = 168f;
+        float panelH = IsInVillage ? 140f : 168f;
         Rect panel = new Rect(Screen.width - panelW - 16f, 16f, panelW, panelH);
         RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
         float x = panel.x + 14f;
         float y = panel.y + 10f;
         float textW = panelW - 28f;
+
+        if (IsInVillage)
+        {
+            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.LabelH), "Home Village", RPGUI.Label);
+            y += RPGUI.LabelH;
+            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.HintH),
+                $"Hub · Worlds unlocked 1–{highestWorldUnlocked}/{ProgressionFormulas.WorldCount}",
+                RPGUI.Hint);
+            y += RPGUI.HintH + 10f;
+            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH),
+                "Walk into a lit portal to enter that world", RPGUI.FieldTag);
+            y += RPGUI.FieldTagH + 6f;
+            RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH),
+                "Sealed portals open after you reach that world", RPGUI.FieldTag);
+            return;
+        }
 
         RPGUI.DrawText(new Rect(x, y, textW, RPGUI.LabelH),
             ProgressionFormulas.MapName(currentWorld, currentMap), RPGUI.Label);
@@ -271,16 +378,16 @@ public class AdventureManager : MonoBehaviour
         RPGUI.DrawText(new Rect(x + 170f, y - 2f, textW - 170f, RPGUI.HintH), bossText, RPGUI.Hint);
         y += 28f;
 
-        string tipText = "1–4 Teleport zones";
+        string tipText = "1–4 travel · Green gate → Village";
         if (currentMap == 2) tipText = "1–4 travel · Map 2 Timed Challenge altar (E)";
         else if (currentMap == 3) tipText = "1–4 travel · Map 3 has crystal mines (E)";
         RPGUI.DrawText(new Rect(x, y, textW, RPGUI.FieldTagH), tipText, RPGUI.FieldTag);
 
         if (worldPortalReady)
         {
-            Rect tip = new Rect(Screen.width * 0.5f - 360f, 16f, 720f, RPGUI.BannerH);
+            Rect tip = new Rect(Screen.width * 0.5f - 380f, 16f, 760f, RPGUI.BannerH);
             RPGUI.DrawPanel(tip, new Color(0.22f, 0.12f, 0.38f, 0.94f));
-            RPGUI.DrawText(tip, "Portal open — walk to the glowing gate for the next world", RPGUI.Banner);
+            RPGUI.DrawText(tip, "Next-world portal open — walk in to unlock it in the Village", RPGUI.Banner);
         }
 
         if (currentWorld == ProgressionFormulas.WorldCount && IsBossCleared(ProgressionFormulas.WorldCount, 4))
