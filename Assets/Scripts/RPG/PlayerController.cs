@@ -254,7 +254,7 @@ public class PlayerController : MonoBehaviour
         RPGUI.Ensure();
 
         float panelW = 400f;
-        float panelH = 198f;
+        float panelH = 210f;
         Rect panel = new Rect(16f, 16f, panelW, panelH);
         RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
@@ -265,8 +265,23 @@ public class PlayerController : MonoBehaviour
         RPGUI.DrawText(new Rect(panel.x + 220f, panel.y + 14f, 166f, RPGUI.HintH),
             $"ATK {_stats.attackDamage:0}  DEF {_stats.defense:0}", RPGUI.Hint);
 
+        float barY = panel.y + 50f;
+        float elem = _stats.fireBonus + _stats.iceBonus + _stats.poisonBonus;
+        bool showGems = _stats.critChance > 0.01f || elem > 0.5f || _stats.blockChance > 0.01f
+            || _stats.lifesteal > 0.01f || _stats.damageReduction > 0.01f;
+        if (showGems)
+        {
+            string extras = "";
+            if (_stats.critChance > 0.01f) extras += $"Crit {_stats.critChance * 100f:0}%  ";
+            if (_stats.blockChance > 0.01f) extras += $"Block {_stats.blockChance * 100f:0}%  ";
+            if (_stats.damageReduction > 0.01f) extras += $"DR {_stats.damageReduction * 100f:0}%  ";
+            if (elem > 0.5f) extras += $"Elem +{elem:0}";
+            RPGUI.DrawText(new Rect(panel.x + 14f, panel.y + 42f, panelW - 28f, 16f), extras.Trim(), RPGUI.FieldTag);
+            barY = panel.y + 58f;
+        }
+
         RPGUI.DrawBar(
-            new Rect(panel.x + 14f, panel.y + 52f, panelW - 28f, 28f),
+            new Rect(panel.x + 14f, barY, panelW - 28f, 26f),
             _stats.HealthPercent,
             Color.Lerp(new Color(0.85f, 0.18f, 0.18f), new Color(0.22f, 0.82f, 0.35f), _stats.HealthPercent),
             $"HP  {Mathf.CeilToInt(_stats.currentHealth)} / {Mathf.CeilToInt(_stats.maxHealth)}"
@@ -275,7 +290,7 @@ public class PlayerController : MonoBehaviour
         if (prog != null)
         {
             RPGUI.DrawBar(
-                new Rect(panel.x + 14f, panel.y + 86f, panelW - 28f, 24f),
+                new Rect(panel.x + 14f, barY + 32f, panelW - 28f, 22f),
                 prog.XpPercent,
                 new Color(0.3f, 0.55f, 1f),
                 $"EXP  {prog.xp} / {prog.xpToNext}"
@@ -285,8 +300,9 @@ public class PlayerController : MonoBehaviour
         var inv = PlayerInventory.Instance;
         if (inv != null)
         {
-            DrawHudEquip(panel.x + 14f, panel.y + 120f, 180f, "WPN", inv.equippedWeapon);
-            DrawHudEquip(panel.x + 206f, panel.y + 120f, 180f, "ARM", inv.equippedArmor);
+            float eqY = barY + (prog != null ? 60f : 34f);
+            DrawHudEquip(panel.x + 14f, eqY, 180f, "WPN", inv.equippedWeapon);
+            DrawHudEquip(panel.x + 206f, eqY, 180f, "ARM", inv.equippedArmor);
         }
 
         RPGUI.DrawText(new Rect(16f, panel.yMax + 6f, 560f, RPGUI.HintH),

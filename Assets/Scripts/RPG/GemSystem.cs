@@ -185,6 +185,18 @@ public static class GemCatalog
         var b = new GemBonuses();
         AddFromGear(weapon, ref b);
         AddFromGear(armor, ref b);
+        return ClampBonuses(b);
+    }
+
+    public static GemBonuses BonusesFromGear(ItemInstance gear)
+    {
+        var b = new GemBonuses();
+        AddFromGear(gear, ref b);
+        return ClampBonuses(b);
+    }
+
+    static GemBonuses ClampBonuses(GemBonuses b)
+    {
         b.damageReduction = Mathf.Min(0.55f, b.damageReduction);
         b.blockChance = Mathf.Min(0.5f, b.blockChance);
         b.critChance = Mathf.Min(0.55f, b.critChance);
@@ -200,6 +212,28 @@ public static class GemCatalog
         EnsureSockets(gear);
         for (int i = 0; i < gear.socketCount && i < gear.sockets.Length; i++)
             ApplyGemToBonuses(gear.sockets[i], ref b);
+    }
+
+    /// <summary>Compact list of active bonuses for UI (empty if none).</summary>
+    public static string FormatBonusSummary(GemBonuses b)
+    {
+        var parts = new System.Collections.Generic.List<string>(8);
+        if (b.attackFlat > 0.05f || b.attackPercent > 0.001f)
+            parts.Add($"ATK +{b.attackFlat:0.#}" + (b.attackPercent > 0.001f ? $" (+{b.attackPercent * 100f:0.#}%)" : ""));
+        if (b.defenseFlat > 0.05f || b.defensePercent > 0.001f)
+            parts.Add($"DEF +{b.defenseFlat:0.#}" + (b.defensePercent > 0.001f ? $" (+{b.defensePercent * 100f:0.#}%)" : ""));
+        if (b.maxHpFlat > 0.5f) parts.Add($"HP +{b.maxHpFlat:0}");
+        if (b.critChance > 0.001f) parts.Add($"Crit {b.critChance * 100f:0.#}%");
+        if (b.critDamage > 0.001f) parts.Add($"CritDmg +{b.critDamage * 100f:0}%");
+        if (b.blockChance > 0.001f) parts.Add($"Block {b.blockChance * 100f:0.#}%");
+        if (b.damageReduction > 0.001f) parts.Add($"DR {b.damageReduction * 100f:0.#}%");
+        if (b.reflectPercent > 0.001f) parts.Add($"Reflect {b.reflectPercent * 100f:0.#}%");
+        if (b.fireDamage > 0.05f) parts.Add($"Fire +{b.fireDamage:0.#}");
+        if (b.iceDamage > 0.05f) parts.Add($"Ice +{b.iceDamage:0.#}");
+        if (b.poisonDamage > 0.05f) parts.Add($"Poison +{b.poisonDamage:0.#}");
+        if (b.lifesteal > 0.001f) parts.Add($"Lifesteal {b.lifesteal * 100f:0.#}%");
+        if (b.cooldownReduction > 0.001f) parts.Add($"AtkSpd +{b.cooldownReduction * 100f:0.#}%");
+        return parts.Count == 0 ? "No gem bonuses" : string.Join("  ·  ", parts);
     }
 
     public static ItemInstance CreateGem(GemKind kind, int itemLevel, ItemRarity rarity)
