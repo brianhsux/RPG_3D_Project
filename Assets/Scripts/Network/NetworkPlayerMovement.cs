@@ -49,6 +49,9 @@ public class NetworkPlayerMovement : NetworkBehaviour
         if (!IsSpawned || !IsOwner) return;
         if (_controller == null || !_controller.enabled) return;
 
+        var combat = GetComponent<NetworkPlayerCombat>();
+        if (combat != null && !combat.IsAlive) return;
+
         // Don't steal input while character panel is open (same as solo).
         if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel)
             return;

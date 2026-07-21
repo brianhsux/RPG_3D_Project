@@ -103,6 +103,7 @@ public class NetBootstrap : MonoBehaviour
             connectPort == 0 ? DefaultPort : connectPort);
 
         AssignPlayerPrefab(nm);
+        EnsureCombatSession().RegisterPrefabs(nm);
         HookCallbacks(nm);
     }
 
@@ -144,6 +145,7 @@ public class NetBootstrap : MonoBehaviour
         nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner;
         go.AddComponent<NetworkPlayer>();
         go.AddComponent<NetworkPlayerMovement>();
+        go.AddComponent<NetworkPlayerCombat>();
 
         // Body visual created by NetworkPlayer.OnNetworkSpawn if missing.
         _runtimePlayerTemplate = go;
@@ -185,8 +187,13 @@ public class NetBootstrap : MonoBehaviour
         SuspendSoloPlayer();
         bool ok = _nm.StartHost();
         Debug.Log(ok ? "[NGO] StartHost OK" : "[NGO] StartHost failed");
-        if (!ok) RestoreSoloPlayer();
-        return ok;
+        if (!ok)
+        {
+            RestoreSoloPlayer();
+            return false;
+        }
+        EnsureCombatSession().OnHostStarted();
+        return true;
     }
 
     public bool StartClient()
@@ -210,6 +217,7 @@ public class NetBootstrap : MonoBehaviour
 
     public void Shutdown()
     {
+        EnsureCombatSession().OnShutdown();
         var nm = NetworkManager;
         if (nm != null && (nm.IsListening || nm.IsClient))
         {
@@ -217,6 +225,14 @@ public class NetBootstrap : MonoBehaviour
             Debug.Log("[NGO] Shutdown");
         }
         RestoreSoloPlayer();
+    }
+
+    NetCombatSession EnsureCombatSession()
+    {
+        var session = GetComponent<NetCombatSession>();
+        if (session == null)
+            session = gameObject.AddComponent<NetCombatSession>();
+        return session;
     }
 
     void SuspendSoloPlayer()

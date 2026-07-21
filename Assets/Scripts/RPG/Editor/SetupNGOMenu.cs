@@ -1,17 +1,17 @@
 using Unity.Netcode;
 using Unity.Netcode.Components;
-using Unity.Netcode.Transports.UTP;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
-/// One-click NGO wiring: NetworkPlayer prefab under Resources + scene NetHud/NetBootstrap/NetworkManager.
+/// One-click NGO wiring: NetworkPlayer / NetworkEnemy prefabs + scene NetHud.
 /// </summary>
 public static class SetupNGOMenu
 {
     const string PrefabDir = "Assets/Resources";
-    const string PrefabPath = PrefabDir + "/NetworkPlayer.prefab";
+    const string PlayerPrefabPath = PrefabDir + "/NetworkPlayer.prefab";
+    const string EnemyPrefabPath = PrefabDir + "/NetworkEnemy.prefab";
 
     [InitializeOnLoadMethod]
     static void AutoCreatePrefabWhenMissing()
@@ -19,11 +19,18 @@ public static class SetupNGOMenu
         EditorApplication.delayCall += () =>
         {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            if (AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath) != null) return;
             try
             {
-                EnsurePlayerPrefab();
-                Debug.Log("[NGO] Auto-created Resources/NetworkPlayer.prefab");
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath) == null)
+                {
+                    EnsurePlayerPrefab();
+                    Debug.Log("[NGO] Auto-created Resources/NetworkPlayer.prefab");
+                }
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(EnemyPrefabPath) == null)
+                {
+                    EnsureEnemyPrefab();
+                    Debug.Log("[NGO] Auto-created Resources/NetworkEnemy.prefab");
+                }
             }
             catch (System.Exception e)
             {
@@ -36,10 +43,11 @@ public static class SetupNGOMenu
     public static void Setup()
     {
         EnsurePlayerPrefab();
+        EnsureEnemyPrefab();
         EnsureSceneObjects();
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
         AssetDatabase.SaveAssets();
-        Debug.Log("[NGO] Setup complete: Resources/NetworkPlayer.prefab + NetHud in scene.");
+        Debug.Log("[NGO] Setup complete: NetworkPlayer + NetworkEnemy prefabs + NetHud.");
     }
 
     [MenuItem("RPG/Create NetworkPlayer Prefab Only")]
@@ -50,15 +58,30 @@ public static class SetupNGOMenu
         EditorGUIUtility.PingObject(prefab);
     }
 
-    static GameObject EnsurePlayerPrefab()
+    [MenuItem("RPG/Create NetworkEnemy Prefab Only")]
+    public static void CreateEnemyPrefabOnly()
+    {
+        var prefab = EnsureEnemyPrefab();
+        Selection.activeObject = prefab;
+        EditorGUIUtility.PingObject(prefab);
+    }
+
+    static void EnsureResourcesFolder()
     {
         if (!AssetDatabase.IsValidFolder("Assets/Resources"))
             AssetDatabase.CreateFolder("Assets", "Resources");
+    }
 
-        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+    static GameObject EnsurePlayerPrefab()
+    {
+        EnsureResourcesFolder();
+
+        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
         if (existing != null)
         {
-            ConfigureNetworkTransform(existing.GetComponent<NetworkTransform>());
+            ConfigureOwnerTransform(existing.GetComponent<NetworkTransform>());
+            if (existing.GetComponent<NetworkPlayerCombat>() == null)
+                existing.AddComponent<NetworkPlayerCombat>();
             PrefabUtility.SavePrefabAsset(existing);
             return existing;
         }
@@ -71,9 +94,10 @@ public static class SetupNGOMenu
 
         root.AddComponent<NetworkObject>();
         var nt = root.AddComponent<NetworkTransform>();
-        ConfigureNetworkTransform(nt);
+        ConfigureOwnerTransform(nt);
         root.AddComponent<NetworkPlayer>();
         root.AddComponent<NetworkPlayerMovement>();
+        root.AddComponent<NetworkPlayerCombat>();
 
         var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         body.name = "Body";
@@ -82,16 +106,53 @@ public static class SetupNGOMenu
         body.transform.localScale = new Vector3(0.8f, 1f, 0.8f);
         Object.DestroyImmediate(body.GetComponent<Collider>());
 
-        var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+        var prefab = PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
         Object.DestroyImmediate(root);
         AssetDatabase.SaveAssets();
         return prefab;
     }
 
-    static void ConfigureNetworkTransform(NetworkTransform nt)
+    static GameObject EnsureEnemyPrefab()
+    {
+        EnsureResourcesFolder();
+
+        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(EnemyPrefabPath);
+        if (existing != null)
+        {
+            ConfigureServerTransform(existing.GetComponent<NetworkTransform>());
+            PrefabUtility.SavePrefabAsset(existing);
+            return existing;
+        }
+
+        var root = new GameObject("NetworkEnemy");
+        root.AddComponent<NetworkObject>();
+        var nt = root.AddComponent<NetworkTransform>();
+        ConfigureServerTransform(nt);
+        root.AddComponent<NetworkEnemy>();
+
+        var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        body.name = "Body";
+        body.transform.SetParent(root.transform, false);
+        body.transform.localPosition = new Vector3(0f, 1f, 0f);
+        body.transform.localScale = new Vector3(0.9f, 1f, 0.9f);
+        Object.DestroyImmediate(body.GetComponent<Collider>());
+
+        var prefab = PrefabUtility.SaveAsPrefabAsset(root, EnemyPrefabPath);
+        Object.DestroyImmediate(root);
+        AssetDatabase.SaveAssets();
+        return prefab;
+    }
+
+    static void ConfigureOwnerTransform(NetworkTransform nt)
     {
         if (nt == null) return;
         nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner;
+    }
+
+    static void ConfigureServerTransform(NetworkTransform nt)
+    {
+        if (nt == null) return;
+        nt.AuthorityMode = NetworkTransform.AuthorityModes.Server;
     }
 
     static void EnsureSceneObjects()
@@ -106,27 +167,36 @@ public static class SetupNGOMenu
 
         if (hud.GetComponent<NetBootstrap>() == null)
             Undo.AddComponent<NetBootstrap>(hud.gameObject);
+        if (hud.GetComponent<NetCombatSession>() == null)
+            Undo.AddComponent<NetCombatSession>(hud.gameObject);
 
         var bootstrap = hud.GetComponent<NetBootstrap>();
-        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-        if (bootstrap != null && prefab != null)
+        var session = hud.GetComponent<NetCombatSession>();
+        var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        var enemyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EnemyPrefabPath);
+        if (bootstrap != null && playerPrefab != null)
         {
-            bootstrap.playerPrefab = prefab;
+            bootstrap.playerPrefab = playerPrefab;
             EditorUtility.SetDirty(bootstrap);
         }
+        if (session != null && enemyPrefab != null)
+        {
+            session.enemyPrefab = enemyPrefab;
+            EditorUtility.SetDirty(session);
+        }
 
-        // NetworkManager is created at Host/Client time by NetBootstrap — keep it out of
-        // the scene so solo Play Mode does not trigger NGO's "add scene to build" dialog.
         var existingNm = Object.FindFirstObjectByType<NetworkManager>();
         if (existingNm != null)
         {
             existingNm.NetworkConfig.EnableSceneManagement = false;
-            if (prefab != null)
+            if (playerPrefab != null)
             {
-                existingNm.NetworkConfig.PlayerPrefab = prefab;
-                if (!existingNm.NetworkConfig.Prefabs.Contains(prefab))
-                    existingNm.AddNetworkPrefab(prefab);
+                existingNm.NetworkConfig.PlayerPrefab = playerPrefab;
+                if (!existingNm.NetworkConfig.Prefabs.Contains(playerPrefab))
+                    existingNm.AddNetworkPrefab(playerPrefab);
             }
+            if (enemyPrefab != null && !existingNm.NetworkConfig.Prefabs.Contains(enemyPrefab))
+                existingNm.AddNetworkPrefab(enemyPrefab);
             EditorUtility.SetDirty(existingNm);
         }
     }

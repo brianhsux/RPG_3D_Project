@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
 /// <summary>
 /// Simple IMGUI panel for NGO Host / Client / Disconnect.
@@ -31,6 +32,8 @@ public class NetHud : MonoBehaviour
 
         if (GetComponent<NetBootstrap>() == null && NetBootstrap.Instance == null)
             gameObject.AddComponent<NetBootstrap>();
+        if (GetComponent<NetCombatSession>() == null)
+            gameObject.AddComponent<NetCombatSession>();
     }
 
     void OnDestroy()
@@ -50,14 +53,13 @@ public class NetHud : MonoBehaviour
         if (!showPanel) return;
         if (AccountManager.Instance != null && !AccountManager.Instance.IsReady)
             return;
-        // Keep usable even with inventory open so you can disconnect.
         RPGUI.Ensure();
 
         var boot = NetBootstrap.Instance;
         if (boot == null) return;
 
-        float w = 320f;
-        float h = 168f;
+        float w = 340f;
+        float h = boot.IsNetworking ? 200f : 168f;
         Rect panel = new Rect(16f, Screen.height - h - 16f, w, h);
         RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
@@ -87,9 +89,36 @@ public class NetHud : MonoBehaviour
         {
             if (RPGUI.ButtonSm(new Rect(x, y, tw, RPGUI.ButtonSmH), "Disconnect", true))
                 boot.Shutdown();
-            y += RPGUI.ButtonSmH + 8f;
+            y += RPGUI.ButtonSmH + 6f;
+
+            string hpLine = LocalHpLabel();
+            if (!string.IsNullOrEmpty(hpLine))
+            {
+                RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH), hpLine, RPGUI.FieldTag);
+                y += RPGUI.FieldTagH + 2f;
+            }
+
             RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH),
-                "2nd play mode / build → Client", RPGUI.FieldTag);
+                "LMB/F attack · Host spawns 3 test enemies", RPGUI.FieldTag);
         }
+    }
+
+    static string LocalHpLabel()
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm == null || (!nm.IsListening && !nm.IsClient)) return null;
+
+        NetworkPlayerCombat local = null;
+        var combats = FindObjectsByType<NetworkPlayerCombat>(FindObjectsSortMode.None);
+        for (int i = 0; i < combats.Length; i++)
+        {
+            if (combats[i] != null && combats[i].IsOwner)
+            {
+                local = combats[i];
+                break;
+            }
+        }
+        if (local == null || !local.IsSpawned) return null;
+        return $"HP {Mathf.CeilToInt(local.CurrentHp.Value)}/{Mathf.CeilToInt(local.MaxHp.Value)}";
     }
 }
