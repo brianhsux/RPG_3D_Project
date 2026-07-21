@@ -220,7 +220,7 @@ public static class ArmorVisualUtil
 {
     public static int StyleIndex(int itemLevel)
     {
-        return Mathf.Clamp((Mathf.Max(1, itemLevel) - 1) / 5, 0, 7);
+        return Mathf.Clamp((Mathf.Max(1, itemLevel) - 1) / 12, 0, 7);
     }
 
     public static Color BodyColor(int style, ItemRarity rarity)

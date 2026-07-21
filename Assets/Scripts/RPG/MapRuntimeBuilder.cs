@@ -148,7 +148,7 @@ public class MapRuntimeBuilder : MonoBehaviour
         for (int w = 1; w <= ProgressionFormulas.WorldCount; w++)
         {
             float ang = ((w - 1) / (float)ProgressionFormulas.WorldCount) * Mathf.PI * 2f - Mathf.PI * 0.5f;
-            float rad = 16f;
+            float rad = ProgressionFormulas.WorldCount > 12 ? 22f : 16f;
             Vector3 pos = new Vector3(Mathf.Cos(ang) * rad, 0f, Mathf.Sin(ang) * rad);
             bool open = w <= unlocked;
 
@@ -222,53 +222,71 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     Color ThemeGround(int world)
     {
-        switch (world)
+        Color c;
+        switch (ThemeIndex(world))
         {
-            case 1: return new Color(0.32f, 0.55f, 0.25f);  // grass
-            case 2: return new Color(0.16f, 0.4f, 0.18f);   // forest
-            case 3: return new Color(0.45f, 0.42f, 0.38f);  // ruins
-            case 4: return new Color(0.45f, 0.22f, 0.12f);  // volcano
-            case 5: return new Color(0.22f, 0.12f, 0.28f);  // end
-            case 6: return new Color(0.72f, 0.82f, 0.92f);  // frost
-            case 7: return new Color(0.72f, 0.58f, 0.32f);  // desert
-            case 8: return new Color(0.22f, 0.38f, 0.28f);  // swamp
-            case 9: return new Color(0.55f, 0.7f, 0.9f);    // sky
-            case 10: return new Color(0.12f, 0.05f, 0.14f); // abyss
-            default: return Color.gray;
+            case 1: c = new Color(0.32f, 0.55f, 0.25f); break;
+            case 2: c = new Color(0.16f, 0.4f, 0.18f); break;
+            case 3: c = new Color(0.45f, 0.42f, 0.38f); break;
+            case 4: c = new Color(0.45f, 0.22f, 0.12f); break;
+            case 5: c = new Color(0.22f, 0.12f, 0.28f); break;
+            case 6: c = new Color(0.72f, 0.82f, 0.92f); break;
+            case 7: c = new Color(0.72f, 0.58f, 0.32f); break;
+            case 8: c = new Color(0.22f, 0.38f, 0.28f); break;
+            case 9: c = new Color(0.55f, 0.7f, 0.9f); break;
+            default: c = new Color(0.12f, 0.05f, 0.14f); break;
         }
+        return ShiftTheme(c, world);
     }
 
     Color ThemeWall(int world)
     {
-        switch (world)
+        Color c;
+        switch (ThemeIndex(world))
         {
-            case 1: return new Color(0.5f, 0.48f, 0.42f);
-            case 2: return new Color(0.28f, 0.22f, 0.14f);
-            case 3: return new Color(0.55f, 0.55f, 0.52f);
-            case 4: return new Color(0.35f, 0.15f, 0.1f);
-            case 5: return new Color(0.15f, 0.08f, 0.2f);
-            case 6: return new Color(0.55f, 0.7f, 0.85f);
-            case 7: return new Color(0.55f, 0.4f, 0.22f);
-            case 8: return new Color(0.18f, 0.28f, 0.2f);
-            case 9: return new Color(0.75f, 0.8f, 0.9f);
-            case 10: return new Color(0.25f, 0.08f, 0.12f);
-            default: return Color.gray;
+            case 1: c = new Color(0.5f, 0.48f, 0.42f); break;
+            case 2: c = new Color(0.28f, 0.22f, 0.14f); break;
+            case 3: c = new Color(0.55f, 0.55f, 0.52f); break;
+            case 4: c = new Color(0.35f, 0.15f, 0.1f); break;
+            case 5: c = new Color(0.15f, 0.08f, 0.2f); break;
+            case 6: c = new Color(0.55f, 0.7f, 0.85f); break;
+            case 7: c = new Color(0.55f, 0.4f, 0.22f); break;
+            case 8: c = new Color(0.18f, 0.28f, 0.2f); break;
+            case 9: c = new Color(0.75f, 0.8f, 0.9f); break;
+            default: c = new Color(0.25f, 0.08f, 0.12f); break;
         }
+        return ShiftTheme(c, world);
     }
 
     Color ThemeBossAccent(int world)
     {
-        switch (world)
+        Color c;
+        switch (ThemeIndex(world))
         {
-            case 4: return new Color(1f, 0.35f, 0.05f);      // lava
-            case 6: return new Color(0.65f, 0.85f, 1f);      // ice
-            case 7: return new Color(0.9f, 0.7f, 0.25f);     // sand glow
-            case 8: return new Color(0.35f, 0.7f, 0.25f);    // toxic
-            case 9: return new Color(0.85f, 0.9f, 1f);       // cloud
-            case 10: return new Color(0.7f, 0.15f, 0.85f);   // void
-            case 5: return new Color(0.55f, 0.2f, 0.75f);
-            default: return new Color(0.55f, 0.12f, 0.12f);
+            case 4: c = new Color(1f, 0.35f, 0.05f); break;
+            case 6: c = new Color(0.65f, 0.85f, 1f); break;
+            case 7: c = new Color(0.9f, 0.7f, 0.25f); break;
+            case 8: c = new Color(0.35f, 0.7f, 0.25f); break;
+            case 9: c = new Color(0.85f, 0.9f, 1f); break;
+            case 10: c = new Color(0.7f, 0.15f, 0.85f); break;
+            case 5: c = new Color(0.55f, 0.2f, 0.75f); break;
+            default: c = new Color(0.55f, 0.12f, 0.12f); break;
         }
+        return ShiftTheme(c, world);
+    }
+
+    static int ThemeIndex(int world)
+    {
+        world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
+        return ((world - 1) % 10) + 1;
+    }
+
+    static Color ShiftTheme(Color c, int world)
+    {
+        if (world <= 10) return c;
+        float t = ((world - 11) % 15) / 15f;
+        // Mild channel rotate so late worlds don't look identical to early clones.
+        return Color.Lerp(c, new Color(c.b, c.r, c.g, c.a), 0.18f + t * 0.22f);
     }
 
     Color ZoneFloor(int world, int map)
@@ -379,7 +397,7 @@ public class MapRuntimeBuilder : MonoBehaviour
     {
         var wall = MakeTempMat(ThemeWall(world));
         var accent = MakeTempMat(ThemeBossAccent(world));
-        switch (world)
+        switch (ThemeIndex(world))
         {
             case 6:
                 Prim(PrimitiveType.Cube, name, pos + Vector3.up * 2.2f, new Vector3(0.7f, 2.2f, 0.7f), accent);
@@ -403,7 +421,7 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     Color ThemePath(int world)
     {
-        switch (world)
+        switch (ThemeIndex(world))
         {
             case 3: return new Color(0.45f, 0.42f, 0.4f);
             case 4: return new Color(0.35f, 0.22f, 0.16f);
@@ -475,7 +493,7 @@ public class MapRuntimeBuilder : MonoBehaviour
                 break;
         }
 
-        switch (world)
+        switch (ThemeIndex(world))
         {
             case 1:
                 if (map == 2) { r.trees = 5; r.grass = 14; r.bushes = 4; r.rocks = 2; }
@@ -604,7 +622,7 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     Color ThemeWood(int world)
     {
-        switch (world)
+        switch (ThemeIndex(world))
         {
             case 4: return new Color(0.25f, 0.12f, 0.08f);
             case 6: return new Color(0.45f, 0.4f, 0.35f);
@@ -617,7 +635,7 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     Color ThemeFoliage(int world)
     {
-        switch (world)
+        switch (ThemeIndex(world))
         {
             case 4: return new Color(0.35f, 0.2f, 0.1f);
             case 5: return new Color(0.35f, 0.15f, 0.45f);
@@ -656,7 +674,7 @@ public class MapRuntimeBuilder : MonoBehaviour
             MakeTempMat(Color.Lerp(ThemeBossAccent(world), Color.black, 0.45f)), parent);
 
         var accent = MakeTempMat(ThemeBossAccent(world));
-        switch (world)
+        switch (ThemeIndex(world))
         {
             case 4:
             case 6:
@@ -693,7 +711,7 @@ public class MapRuntimeBuilder : MonoBehaviour
     void AddWorldLandmarks(Transform parent, Vector3 center, int world, int map, Material wood, Material stone, Material leaf)
     {
         var accent = MakeTempMat(ThemeBossAccent(world));
-        switch (world)
+        switch (ThemeIndex(world))
         {
             case 1:
                 if (map == 1)

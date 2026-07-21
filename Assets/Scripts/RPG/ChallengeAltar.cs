@@ -402,9 +402,10 @@ public class ChallengeAltar : MonoBehaviour
         int gemLevelBonus = _difficulty == Difficulty.Extreme ? 4 : (_difficulty == Difficulty.Hard ? 2 : 1);
 
         ItemRarity gemRarity = ItemRarity.Legendary;
+        int gemBase = ProgressionFormulas.ContentToItemLevel(content);
         var gem = GemCatalog.CreateGem(
             (GemKind)Random.Range(0, GemCatalog.KindCount),
-            Mathf.Clamp(content + Random.Range(gemLevelBonus, gemLevelBonus + 3), 1, 50),
+            Mathf.Clamp(gemBase + Random.Range(gemLevelBonus, gemLevelBonus + 4), 1, ProgressionFormulas.MaxItemLevel),
             gemRarity);
         bool gemOk = inv != null && inv.AddItem(gem);
 
@@ -415,7 +416,7 @@ public class ChallengeAltar : MonoBehaviour
         {
             gem2 = GemCatalog.CreateGem(
                 (GemKind)Random.Range(0, GemCatalog.KindCount),
-                Mathf.Clamp(content + Random.Range(1, 4), 1, 50),
+                Mathf.Clamp(gemBase + Random.Range(1, 5), 1, ProgressionFormulas.MaxItemLevel),
                 Random.value < 0.45f ? ItemRarity.Legendary : ItemRarity.Epic);
             gem2Ok = inv.AddItem(gem2);
         }
@@ -424,7 +425,7 @@ public class ChallengeAltar : MonoBehaviour
         if (PlayerPetController.Instance != null)
         {
             var kind = PlayerPetController.RollBossPetKind(world);
-            int petLv = Mathf.Max(1, content / 2 + ExtraLevelFor(_difficulty));
+            int petLv = Mathf.Clamp(gemBase / 2 + ExtraLevelFor(_difficulty) * 2, 1, ProgressionFormulas.MaxPetLevel);
             petOk = PlayerPetController.Instance.TryAddPet(kind, petLv, out _);
         }
 

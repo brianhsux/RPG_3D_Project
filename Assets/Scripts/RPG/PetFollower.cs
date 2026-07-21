@@ -39,8 +39,7 @@ public class PetFollower : MonoBehaviour
         if (_owner == null || AccountManager.Instance == null || !AccountManager.Instance.IsReady)
             return;
 
-        var inv = PlayerInventory.Instance;
-        if (inv != null && inv.showPanel) return;
+        // Character panel no longer pauses the world — pets keep fighting.
 
         if (_ownerStats != null && _ownerStats.isDead)
             return;

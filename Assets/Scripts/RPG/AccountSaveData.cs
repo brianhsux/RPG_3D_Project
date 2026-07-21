@@ -86,7 +86,7 @@ public class ItemSaveData
         {
             return GemCatalog.CreateGem(
                 (GemKind)Mathf.Clamp(gemKind, 0, GemCatalog.KindCount - 1),
-                Mathf.Clamp(itemLevel, 1, 40),
+                Mathf.Clamp(itemLevel, 1, ProgressionFormulas.MaxItemLevel),
                 (ItemRarity)Mathf.Clamp(rarity, 0, 4));
         }
 
@@ -96,7 +96,7 @@ public class ItemSaveData
             displayName = displayName,
             slot = (ItemSlot)slot,
             rarity = (ItemRarity)rarity,
-            itemLevel = Mathf.Clamp(itemLevel, 1, 40),
+            itemLevel = Mathf.Clamp(itemLevel, 1, ProgressionFormulas.MaxItemLevel),
             attack = attack,
             defense = defense,
             maxHpBonus = maxHpBonus,

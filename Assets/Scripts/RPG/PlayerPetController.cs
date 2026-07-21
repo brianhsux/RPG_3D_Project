@@ -111,7 +111,8 @@ public class PlayerPetController : MonoBehaviour
         {
             if (owned[i] != null && owned[i].kind == kind)
             {
-                owned[i].level = Mathf.Min(40, owned[i].level + Mathf.Max(1, level / 4));
+                owned[i].level = Mathf.Min(ProgressionFormulas.MaxPetLevel,
+                    owned[i].level + Mathf.Max(1, level / 4));
                 added = owned[i];
                 if (PlayerInventory.Instance != null)
                     PlayerInventory.Instance.ShowLoot($"{added.displayName} grew to Lv {added.level}!");
@@ -164,7 +165,7 @@ public class PlayerPetController : MonoBehaviour
         if (pet == null || amount <= 0) return;
         pet.xp += amount;
         bool leveled = false;
-        while (pet.level < 40 && pet.xp >= PetCatalog.XpToNext(pet.level))
+        while (pet.level < ProgressionFormulas.MaxPetLevel && pet.xp >= PetCatalog.XpToNext(pet.level))
         {
             pet.xp -= PetCatalog.XpToNext(pet.level);
             pet.level++;
@@ -215,8 +216,9 @@ public class PlayerPetController : MonoBehaviour
 
     public static PetKind RollBossPetKind(int world)
     {
-        // Slight theme bias by world, still all 3 available
         float r = Random.value;
+        if (world >= 20) return r < 0.5f ? PetKind.StormHawk : (r < 0.8f ? PetKind.ShadowWolf : PetKind.EmberFox);
+        if (world >= 12) return r < 0.45f ? PetKind.StormHawk : (r < 0.75f ? PetKind.ShadowWolf : PetKind.EmberFox);
         if (world >= 8) return r < 0.45f ? PetKind.StormHawk : (r < 0.75f ? PetKind.ShadowWolf : PetKind.EmberFox);
         if (world >= 4) return r < 0.4f ? PetKind.ShadowWolf : (r < 0.7f ? PetKind.EmberFox : PetKind.StormHawk);
         return r < 0.5f ? PetKind.EmberFox : (r < 0.8f ? PetKind.ShadowWolf : PetKind.StormHawk);

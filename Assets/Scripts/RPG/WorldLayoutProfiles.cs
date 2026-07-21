@@ -66,19 +66,85 @@ public static class WorldLayoutProfiles
     public static Layout ForWorld(int world)
     {
         world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
-        switch (world)
+        int theme = ((world - 1) % 10) + 1;
+        Layout L;
+        switch (theme)
         {
-            case 1: return Plains();
-            case 2: return Forest();
-            case 3: return Ruins();
-            case 4: return Volcano();
-            case 5: return Apocalypse();
-            case 6: return Frost();
-            case 7: return Desert();
-            case 8: return Swamp();
-            case 9: return Sky();
-            default: return Abyss();
+            case 1: L = Plains(); break;
+            case 2: L = Forest(); break;
+            case 3: L = Ruins(); break;
+            case 4: L = Volcano(); break;
+            case 5: L = Apocalypse(); break;
+            case 6: L = Frost(); break;
+            case 7: L = Desert(); break;
+            case 8: L = Swamp(); break;
+            case 9: L = Sky(); break;
+            default: L = Abyss(); break;
         }
+        if (world > 10)
+            Remix(L, world);
+        return L;
+    }
+
+    /// <summary>Late worlds reuse a base silhouette but flip / stretch so routes feel different.</summary>
+    static void Remix(Layout L, int world)
+    {
+        int gen = (world - 1) / 10; // 1 for 11–20, 2 for 21–25
+        float sx = (world % 2 == 0) ? -1.08f : 1.12f;
+        float sz = (world % 3 == 0) ? -1.1f : 1.05f;
+        float rot = (world * 17) % 360;
+
+        L.hub = new Vector3(L.hub.x * sx, 0f, L.hub.z * sz);
+        L.hubScale *= 1f + gen * 0.08f;
+        for (int i = 1; i <= 4; i++)
+        {
+            Vector3 c = L.zoneCenters[i];
+            L.zoneCenters[i] = RotateY(new Vector3(c.x * sx, 0f, c.z * sz), rot * 0.15f);
+            L.zoneSizes[i] *= 1f + (world % 5) * 0.02f;
+            Vector3 o = L.spawnOffsets[i];
+            L.spawnOffsets[i] = new Vector3(o.x * sx, o.y, o.z * sz);
+        }
+
+        if (L.paths != null)
+        {
+            for (int i = 0; i < L.paths.Length; i++)
+            {
+                var p = L.paths[i];
+                Vector3 pos = RotateY(new Vector3(p.pos.x * sx, p.pos.y, p.pos.z * sz), rot * 0.15f);
+                L.paths[i] = new PathSeg(pos.x, pos.z, p.scale.x, p.scale.z, p.yawY + rot * 0.1f);
+            }
+        }
+        if (L.blockers != null)
+        {
+            for (int i = 0; i < L.blockers.Length; i++)
+            {
+                var b = L.blockers[i];
+                Vector3 pos = RotateY(new Vector3(b.pos.x * sx, 0f, b.pos.z * sz), rot * 0.15f);
+                L.blockers[i] = new Blocker(pos.x, pos.z, b.scale.x, b.scale.y, b.scale.z, b.yawY + rot * 0.1f);
+            }
+        }
+
+        Vector3 a = L.altarPos;
+        L.altarPos = RotateY(new Vector3(a.x * sx, 0f, a.z * sz), rot * 0.15f);
+        Vector3 v = L.villageReturnPos;
+        L.villageReturnPos = RotateY(new Vector3(v.x * sx, 0f, v.z * sz), rot * 0.15f);
+        L.leashMul *= 1f + gen * 0.05f;
+        L.mobCounts = new[]
+        {
+            0,
+            Mathf.Clamp(L.mobCounts[1] + (world % 3 == 0 ? 1 : 0), 3, 6),
+            Mathf.Clamp(L.mobCounts[2] + (world % 2 == 0 ? 1 : 0), 3, 6),
+            Mathf.Clamp(L.mobCounts[3] + gen, 4, 7),
+            1
+        };
+    }
+
+    static Vector3 RotateY(Vector3 v, float degrees)
+    {
+        float r = degrees * Mathf.Deg2Rad;
+        float c = Mathf.Cos(r);
+        float s = Mathf.Sin(r);
+        return new Vector3(v.x * c - v.z * s, v.y, v.x * s + v.z * c);
     }
 
     static Layout Base()

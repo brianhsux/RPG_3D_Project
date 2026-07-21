@@ -56,27 +56,31 @@ public static class EnemyVisuals
         }
     }
 
-    /// <summary>One unique monster type per zone — no kind reused across worlds.</summary>
+    /// <summary>
+    /// Monster kinds for maps 1–3. Worlds 1–10 each have a unique trio;
+    /// worlds 11–25 rotate that palette so every zone still feels themed.
+    /// </summary>
     public static EnemyKind KindForZone(int world, int map)
     {
         EnemyKind[,] table =
         {
-            // map1, map2, map3
-            { EnemyKind.Slime, EnemyKind.Wolf, EnemyKind.Beetle },         // 1 草原
-            { EnemyKind.Goblin, EnemyKind.Mushroom, EnemyKind.Spider },    // 2 森林
-            { EnemyKind.Skeleton, EnemyKind.Ghost, EnemyKind.Wraith },     // 3 遺跡
-            { EnemyKind.Imp, EnemyKind.LavaSpawn, EnemyKind.Golem },       // 4 火山
-            { EnemyKind.Demon, EnemyKind.Crystal, EnemyKind.Treant },      // 5 終焉
-            { EnemyKind.Bat, EnemyKind.Yeti, EnemyKind.IceElemental },    // 6 冰霜
-            { EnemyKind.Scorpion, EnemyKind.Mummy, EnemyKind.SandWorm },  // 7 沙漠
-            { EnemyKind.Toad, EnemyKind.Leech, EnemyKind.Mosquito },      // 8 沼澤
-            { EnemyKind.Harpy, EnemyKind.StormSprite, EnemyKind.Griffon },// 9 天空
-            { EnemyKind.ShadowHound, EnemyKind.VoidEye, EnemyKind.Tentacle } // 10 深淵
+            { EnemyKind.Slime, EnemyKind.Wolf, EnemyKind.Beetle },
+            { EnemyKind.Goblin, EnemyKind.Mushroom, EnemyKind.Spider },
+            { EnemyKind.Skeleton, EnemyKind.Ghost, EnemyKind.Wraith },
+            { EnemyKind.Imp, EnemyKind.LavaSpawn, EnemyKind.Golem },
+            { EnemyKind.Demon, EnemyKind.Crystal, EnemyKind.Treant },
+            { EnemyKind.Bat, EnemyKind.Yeti, EnemyKind.IceElemental },
+            { EnemyKind.Scorpion, EnemyKind.Mummy, EnemyKind.SandWorm },
+            { EnemyKind.Toad, EnemyKind.Leech, EnemyKind.Mosquito },
+            { EnemyKind.Harpy, EnemyKind.StormSprite, EnemyKind.Griffon },
+            { EnemyKind.ShadowHound, EnemyKind.VoidEye, EnemyKind.Tentacle }
         };
 
         world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
         map = Mathf.Clamp(map, 1, 3);
-        return table[world - 1, map - 1];
+        int theme = (world - 1) % 10;
+        int mapIdx = (map - 1 + (world - 1) / 10) % 3;
+        return table[theme, mapIdx];
     }
 
     /// <summary>Map4 always uses the world boss silhouette.</summary>
@@ -354,8 +358,9 @@ public static class EnemyVisuals
     static void BuildWorldBoss(Transform parent, float scale)
     {
         int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
+        int theme = ((world - 1) % 10) + 1;
         Color armorC, darkC, accentC, eyeC;
-        switch (world)
+        switch (theme)
         {
             case 1: armorC = new Color(0.35f, 0.55f, 0.25f); darkC = new Color(0.2f, 0.3f, 0.12f); accentC = new Color(0.9f, 0.8f, 0.3f); eyeC = new Color(1f, 0.9f, 0.2f); break;
             case 2: armorC = new Color(0.2f, 0.45f, 0.18f); darkC = new Color(0.15f, 0.2f, 0.1f); accentC = new Color(0.6f, 0.9f, 0.3f); eyeC = new Color(0.8f, 1f, 0.4f); break;
@@ -367,6 +372,12 @@ public static class EnemyVisuals
             case 8: armorC = new Color(0.25f, 0.45f, 0.28f); darkC = new Color(0.12f, 0.2f, 0.12f); accentC = new Color(0.5f, 0.9f, 0.35f); eyeC = new Color(0.7f, 1f, 0.3f); break;
             case 9: armorC = new Color(0.7f, 0.8f, 0.95f); darkC = new Color(0.4f, 0.5f, 0.65f); accentC = new Color(1f, 1f, 1f); eyeC = new Color(0.6f, 0.85f, 1f); break;
             default: armorC = new Color(0.35f, 0.08f, 0.4f); darkC = new Color(0.08f, 0.02f, 0.1f); accentC = new Color(0.9f, 0.2f, 1f); eyeC = new Color(1f, 0.15f, 0.5f); break;
+        }
+        if (world > 10)
+        {
+            float t = ((world - 11) % 15) / 15f;
+            armorC = Color.Lerp(armorC, new Color(armorC.b, armorC.r, armorC.g), 0.2f + t * 0.2f);
+            accentC = Color.Lerp(accentC, new Color(accentC.g, accentC.b, accentC.r), 0.15f + t * 0.2f);
         }
 
         var armor = Mat(armorC);
@@ -390,8 +401,8 @@ public static class EnemyVisuals
         Part(parent, PrimitiveType.Cube, "LegR", new Vector3(0.4f * scale, 0.4f * scale, 0f), new Vector3(0.45f, 0.8f, 0.45f) * scale, dark);
         Part(parent, PrimitiveType.Cube, "Cape", new Vector3(0f, 1.5f * scale, -0.6f * scale), new Vector3(1.4f, 1.6f, 0.12f) * scale, dark);
 
-        // Extra silhouette cue per world
-        switch (world)
+        // Extra silhouette cue per theme (shared across remixed late worlds)
+        switch (theme)
         {
             case 6:
                 Part(parent, PrimitiveType.Cube, "IceHornL", new Vector3(-0.4f * scale, 3.5f * scale, 0f), new Vector3(0.15f, 0.7f, 0.15f) * scale, gold);

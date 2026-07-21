@@ -186,7 +186,9 @@ public class CharacterStats : MonoBehaviour
                 {
                     int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
                     var kind = PlayerPetController.RollBossPetKind(world);
-                    int lv = Mathf.Clamp(contentLevel / 2, 1, 20);
+                    int lv = Mathf.Clamp(
+                        ProgressionFormulas.ContentToItemLevel(contentLevel) / 2,
+                        1, ProgressionFormulas.MaxPetLevel);
                     PlayerPetController.Instance.TryAddPet(kind, lv, out _);
                     if (AccountManager.Instance != null)
                         AccountManager.Instance.SaveActive(silent: true);

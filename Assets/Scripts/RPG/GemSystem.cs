@@ -137,8 +137,10 @@ public static class GemCatalog
 
     public static float PowerScale(int itemLevel, ItemRarity rarity)
     {
+        itemLevel = Mathf.Clamp(itemLevel, 1, ProgressionFormulas.MaxItemLevel);
         float r = 1f + (int)rarity * 0.22f;
-        return (0.85f + itemLevel * 0.045f) * r;
+        // Sqrt softens 1–100 so late gems stay strong but not 2.5× the old lv40 peak.
+        return (0.75f + Mathf.Sqrt(itemLevel) * 0.38f) * r;
     }
 
     public static void ApplyGemToBonuses(ItemInstance gem, ref GemBonuses b)
@@ -252,7 +254,7 @@ public static class GemCatalog
 
     public static ItemInstance CreateGem(GemKind kind, int itemLevel, ItemRarity rarity)
     {
-        itemLevel = Mathf.Clamp(itemLevel, 1, 40);
+        itemLevel = Mathf.Clamp(itemLevel, 1, ProgressionFormulas.MaxItemLevel);
         var gem = new ItemInstance
         {
             id = System.Guid.NewGuid().ToString("N"),
@@ -272,7 +274,7 @@ public static class GemCatalog
 
     public static ItemInstance RollMineDrop(int contentLevel)
     {
-        int lv = Mathf.Clamp(contentLevel + Random.Range(-1, 3), 1, 40);
+        int lv = ProgressionFormulas.RollItemLevel(contentLevel, fromBoss: false);
         var rarity = ProgressionFormulas.RollRarity(contentLevel, contentLevel >= 20);
         if (rarity == ItemRarity.Legendary && Random.value > 0.35f)
             rarity = ItemRarity.Epic;

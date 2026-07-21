@@ -597,7 +597,7 @@ public class PlayerInventory : MonoBehaviour
     {
         if (showPanel == open) return;
         showPanel = open;
-        Time.timeScale = open ? 0f : 1f;
+        // Do not pause — combat and movement continue while browsing.
         if (!open)
         {
             _selectedGemBagIndex = -1;
@@ -649,16 +649,6 @@ public class PlayerInventory : MonoBehaviour
         float w = MathMin(Screen.width - 32f, 1040f);
         float h = Mathf.Min(Screen.height - 24f, 820f);
         Rect panel = new Rect(Screen.width * 0.5f - w * 0.5f, Screen.height * 0.5f - h * 0.5f, w, h);
-
-        if (Event.current.type == EventType.MouseDown &&
-            Event.current.button == 0 &&
-            !panel.Contains(Event.current.mousePosition))
-        {
-            SetPanelOpen(false);
-            Event.current.Use();
-            GUI.depth = prevDepth;
-            return;
-        }
 
         RPGUI.DrawPanel(panel, new Color(0.045f, 0.055f, 0.08f, 0.98f));
 

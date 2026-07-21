@@ -268,12 +268,13 @@ public static class WeaponVisualUtil
 {
     public static int StyleIndex(int itemLevel)
     {
-        return Mathf.Clamp((Mathf.Max(1, itemLevel) - 1) / 5, 0, 7);
+        return Mathf.Clamp((Mathf.Max(1, itemLevel) - 1) / 12, 0, 7);
     }
 
     public static float SizeScale(int itemLevel, ItemRarity rarity)
     {
-        float s = 0.88f + itemLevel * 0.018f + (int)rarity * 0.07f;
+        float lv = Mathf.Sqrt(Mathf.Max(1, itemLevel));
+        float s = 0.88f + lv * 0.055f + (int)rarity * 0.07f;
         return Mathf.Clamp(s, 0.85f, 1.55f);
     }
 

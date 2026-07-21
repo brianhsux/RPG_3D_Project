@@ -60,13 +60,6 @@ public class PlayerController : MonoBehaviour
 
         if (_bodyAnim != null) _bodyAnim.SetDead(false);
 
-        var inv = PlayerInventory.Instance;
-        if (inv != null && inv.showPanel)
-        {
-            if (_bodyAnim != null) _bodyAnim.SetMoveAmount(0f);
-            return;
-        }
-
         Vector2 move = ReadMoveInput();
         Vector3 input = new Vector3(move.x, 0f, move.y);
         if (input.sqrMagnitude > 1f) input.Normalize();
@@ -106,8 +99,9 @@ public class PlayerController : MonoBehaviour
             _bodyAnim.SetGrounded(grounded);
         }
 
-        // Auto-attack in range; click still forces an attack attempt
-        if (HasEnemyInAttackRange() || WasAttackPressed())
+        // Auto-attack in range; click still forces an attack (unless Character panel eats the click)
+        bool panelOpen = PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel;
+        if (HasEnemyInAttackRange() || (!panelOpen && WasAttackPressed()))
             TryAttack();
 
         TryInteractInput();

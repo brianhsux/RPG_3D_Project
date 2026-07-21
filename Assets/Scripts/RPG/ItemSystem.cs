@@ -131,7 +131,7 @@ public static class ItemFactory
     /// <param name="forcedProfile">-1 random; 0 Balanced; 1 Swift; 2 Reach (weapons only).</param>
     public static ItemInstance Create(ItemSlot slot, int itemLevel, ItemRarity rarity, int forcedProfile)
     {
-        itemLevel = Mathf.Clamp(itemLevel, 1, 40);
+        itemLevel = Mathf.Clamp(itemLevel, 1, ProgressionFormulas.MaxItemLevel);
         var item = new ItemInstance
         {
             id = System.Guid.NewGuid().ToString("N"),
@@ -140,7 +140,8 @@ public static class ItemFactory
             rarity = rarity
         };
 
-        int nameIndex = Mathf.Clamp((itemLevel - 1) / 5, 0, 7);
+        // 8 visual/name tiers across 1–100 (~12–13 levels each)
+        int nameIndex = Mathf.Clamp((itemLevel - 1) / 12, 0, 7);
         if (slot == ItemSlot.Weapon)
         {
             int profile = forcedProfile >= 0 && forcedProfile <= 2
@@ -164,6 +165,8 @@ public static class ItemFactory
     {
         item.weaponProfile = profile;
         float atk = ProgressionFormulas.WeaponAttack(item.itemLevel, item.rarity);
+        // Soft level factor so SPD/RNG stay meaningful at 100 without blowing soft caps alone.
+        float lv = Mathf.Sqrt(Mathf.Max(1, item.itemLevel));
         float spd;
         float rng;
         string[] names;
@@ -171,20 +174,20 @@ public static class ItemFactory
         {
             case ProfileSwift:
                 names = SwiftNames;
-                spd = 0.10f + item.itemLevel * 0.008f + (int)item.rarity * 0.035f;
+                spd = 0.08f + lv * 0.028f + (int)item.rarity * 0.03f;
                 rng = -0.05f + (int)item.rarity * 0.02f;
                 atk *= 0.92f;
                 break;
             case ProfileReach:
                 names = ReachNames;
-                spd = -0.04f + (int)item.rarity * 0.01f;
-                rng = 0.30f + item.itemLevel * 0.022f + (int)item.rarity * 0.08f;
+                spd = -0.03f + (int)item.rarity * 0.01f;
+                rng = 0.25f + lv * 0.065f + (int)item.rarity * 0.07f;
                 atk *= 0.96f;
                 break;
             default:
                 names = WeaponNames;
-                spd = 0.02f + (int)item.rarity * 0.015f;
-                rng = 0.08f + item.itemLevel * 0.008f + (int)item.rarity * 0.03f;
+                spd = 0.02f + (int)item.rarity * 0.012f + lv * 0.008f;
+                rng = 0.06f + lv * 0.022f + (int)item.rarity * 0.025f;
                 break;
         }
         item.displayName = $"{RarityName(item.rarity)}·{names[nameIndex]}";

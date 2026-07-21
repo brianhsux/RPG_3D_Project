@@ -19,7 +19,7 @@ public class PetInstance
 
     public static PetInstance Create(PetKind kind, int level = 1)
     {
-        level = Mathf.Clamp(level, 1, 40);
+        level = Mathf.Clamp(level, 1, ProgressionFormulas.MaxPetLevel);
         return new PetInstance
         {
             id = Guid.NewGuid().ToString("N"),
@@ -62,7 +62,7 @@ public class PetSaveData
             id = string.IsNullOrEmpty(id) ? Guid.NewGuid().ToString("N") : id,
             kind = petKind,
             displayName = string.IsNullOrEmpty(displayName) ? PetCatalog.KindName(petKind) : displayName,
-            level = Mathf.Clamp(level, 1, 40),
+            level = Mathf.Clamp(level, 1, ProgressionFormulas.MaxPetLevel),
             xp = Mathf.Max(0, xp)
         };
     }
@@ -150,7 +150,9 @@ public static class PetCatalog
 
     public static int XpToNext(int level)
     {
-        return 20 + level * 12;
+        level = Mathf.Clamp(level, 1, ProgressionFormulas.MaxPetLevel);
+        // Scales smoothly toward 100.
+        return 18 + level * 10 + (level * level) / 12;
     }
 
     public static string StatsLine(PetInstance pet, float playerAttack)

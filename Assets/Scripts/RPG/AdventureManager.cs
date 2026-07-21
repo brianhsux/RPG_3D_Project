@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Village hub + 10 worlds × 4 map tiles.
+/// Village hub + 25 worlds × 4 map tiles (content level 1–100).
 /// Login always starts in the Village. World portals unlock after visiting a world.
 /// </summary>
 public class AdventureManager : MonoBehaviour

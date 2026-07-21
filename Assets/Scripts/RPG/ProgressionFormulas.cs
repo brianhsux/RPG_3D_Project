@@ -2,13 +2,17 @@ using UnityEngine;
 
 /// <summary>
 /// Central balance sheet for the adventure.
-/// contentLevel = (world-1)*4 + map  →  range 1..(WorldCount*MapsPerWorld)
+/// contentLevel = (world-1)*4 + map  →  range 1..100 (25 worlds × 4 zones).
 /// </summary>
 public static class ProgressionFormulas
 {
-    public const int WorldCount = 10;
+    public const int WorldCount = 25;
     public const int MapsPerWorld = 4;
-    public const int MaxContentLevel = WorldCount * MapsPerWorld;
+    public const int MaxContentLevel = WorldCount * MapsPerWorld; // 100
+    /// <summary>Hard cap for weapons, armor, and gems (matches MaxContentLevel).</summary>
+    public const int MaxItemLevel = 100;
+    /// <summary>Hard cap for combat pets.</summary>
+    public const int MaxPetLevel = 100;
     /// <summary>AdventureManager / save use 0 for the Village hub (not an adventure world).</summary>
     public const int VillageWorldId = 0;
 
@@ -98,12 +102,18 @@ public static class ProgressionFormulas
     }
 
     // ---- Item stats ----
+    /// <summary>Content level and item level share the same 1–100 band.</summary>
+    public static int ContentToItemLevel(int contentLevel)
+    {
+        return Mathf.Clamp(contentLevel, 1, MaxItemLevel);
+    }
+
     public static int RollItemLevel(int contentLevel, bool fromBoss)
     {
-        int baseLv = contentLevel;
-        int roll = Random.Range(-1, 3); // -1..2
-        if (fromBoss) roll += 2;
-        return Mathf.Clamp(baseLv + roll, 1, MaxContentLevel);
+        int baseLv = ContentToItemLevel(contentLevel);
+        int roll = Random.Range(-2, 3); // -2..2
+        if (fromBoss) roll += 3;
+        return Mathf.Clamp(baseLv + roll, 1, MaxItemLevel);
     }
 
     public static ItemRarity RollRarity(int contentLevel, bool fromBoss)
@@ -121,17 +131,21 @@ public static class ProgressionFormulas
 
     public static float WeaponAttack(int itemLevel, ItemRarity rarity)
     {
-        return (6f + itemLevel * 2.6f + itemLevel * itemLevel * 0.04f) * RarityMult(rarity);
+        itemLevel = Mathf.Clamp(itemLevel, 1, MaxItemLevel);
+        // Mild curve to 100 so synthesis stays rewarding without exploding.
+        return (6f + itemLevel * 2.35f + itemLevel * itemLevel * 0.028f) * RarityMult(rarity);
     }
 
     public static float ArmorDefense(int itemLevel, ItemRarity rarity)
     {
-        return (3f + itemLevel * 1.8f + itemLevel * 0.05f) * RarityMult(rarity);
+        itemLevel = Mathf.Clamp(itemLevel, 1, MaxItemLevel);
+        return (3f + itemLevel * 1.65f + itemLevel * 0.04f) * RarityMult(rarity);
     }
 
     public static float ArmorMaxHp(int itemLevel, ItemRarity rarity)
     {
-        return (12f + itemLevel * 9f + itemLevel * itemLevel * 0.15f) * RarityMult(rarity);
+        itemLevel = Mathf.Clamp(itemLevel, 1, MaxItemLevel);
+        return (12f + itemLevel * 8.2f + itemLevel * itemLevel * 0.11f) * RarityMult(rarity);
     }
 
     /// <summary>Incoming damage after defense. Soft diminishing returns.</summary>
@@ -169,7 +183,7 @@ public static class ProgressionFormulas
         if (Random.value < 0.15f && best < ItemRarity.Legendary)
             best = (ItemRarity)((int)best + 1);
 
-        int newLevel = Mathf.Clamp(avg + bonus, 1, MaxContentLevel);
+        int newLevel = Mathf.Clamp(avg + bonus, 1, MaxItemLevel);
         if (a.slot == ItemSlot.Gem)
         {
             if (a.gemKind != b.gemKind || b.gemKind != c.gemKind) return null;
@@ -207,6 +221,21 @@ public static class ProgressionFormulas
             case 8: return "Swamp";
             case 9: return "Sky";
             case 10: return "Abyss";
+            case 11: return "Aurora";
+            case 12: return "Clockwork";
+            case 13: return "Coral";
+            case 14: return "Ashlands";
+            case 15: return "Mirror";
+            case 16: return "Bloom";
+            case 17: return "Thunderpeak";
+            case 18: return "Boneyard";
+            case 19: return "Sunken";
+            case 20: return "Emberfall";
+            case 21: return "Starfall";
+            case 22: return "Ironclad";
+            case 23: return "Dreamwood";
+            case 24: return "Nullscar";
+            case 25: return "Eternum";
             default: return "Unknown World";
         }
     }
@@ -230,6 +259,21 @@ public static class ProgressionFormulas
             case 8: zone = map == 1 ? "Mud Huts" : map == 2 ? "Poison Swamp" : "Rotroot Forest"; break;
             case 9: zone = map == 1 ? "Sky Village" : map == 2 ? "Cloud Bridge" : "Storm Nest"; break;
             case 10: zone = map == 1 ? "Abyss Dock" : map == 2 ? "Void Rift" : "Demon Lord Antechamber"; break;
+            case 11: zone = map == 1 ? "Northern Lights" : map == 2 ? "Glacier Span" : "Aurora Vault"; break;
+            case 12: zone = map == 1 ? "Gear Town" : map == 2 ? "Cogworks" : "Spring Foundry"; break;
+            case 13: zone = map == 1 ? "Reef Village" : map == 2 ? "Tidal Shelf" : "Pearl Cavern"; break;
+            case 14: zone = map == 1 ? "Cinder Camp" : map == 2 ? "Charred Ridge" : "Ash Spire"; break;
+            case 15: zone = map == 1 ? "Looking-Glass" : map == 2 ? "Echo Fields" : "Reflection Maze"; break;
+            case 16: zone = map == 1 ? "Petal Hamlet" : map == 2 ? "Overgrowth" : "Thorn Spiral"; break;
+            case 17: zone = map == 1 ? "Cliff Hold" : map == 2 ? "Storm Ridge" : "Thunder Nest"; break;
+            case 18: zone = map == 1 ? "Ossuary" : map == 2 ? "Rib Canyon" : "Skull Crypt"; break;
+            case 19: zone = map == 1 ? "Flooded Quay" : map == 2 ? "Kelp Roads" : "Drowned Keep"; break;
+            case 20: zone = map == 1 ? "Ember Hamlet" : map == 2 ? "Falling Sparks" : "Magma Nest"; break;
+            case 21: zone = map == 1 ? "Meteor Camp" : map == 2 ? "Star Dust" : "Comet Crater"; break;
+            case 22: zone = map == 1 ? "Bastion Yard" : map == 2 ? "Plate Forge" : "Siege Yard"; break;
+            case 23: zone = map == 1 ? "Sleeping Grove" : map == 2 ? "Mist Trails" : "Dream Canopy"; break;
+            case 24: zone = map == 1 ? "Scar Edge" : map == 2 ? "Null Wastes" : "Rift Maw"; break;
+            case 25: zone = map == 1 ? "Timeless Gate" : map == 2 ? "Forever Road" : "Crown of Ages"; break;
             default: zone = "Map " + map; break;
         }
         return WorldThemeName(world) + " · " + zone;
