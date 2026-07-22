@@ -96,6 +96,9 @@ public class MapRuntimeBuilder : MonoBehaviour
 
     public void BuildVillage()
     {
+        if (NetPlay.IsServer)
+            NetCombatSession.Instance?.DespawnAllAdventureEnemies();
+
         if (_root != null)
             Destroy(_root.gameObject);
 
@@ -1007,6 +1010,8 @@ public class MapRuntimeBuilder : MonoBehaviour
     {
         if (!NetPlay.IsServer) return;
         if (_root == null) return;
+        if (AdventureManager.Instance != null && AdventureManager.Instance.IsInVillage)
+            return;
 
         int world = AdventureManager.Instance != null ? AdventureManager.Instance.currentWorld : 1;
         if (world < 1) world = 1;

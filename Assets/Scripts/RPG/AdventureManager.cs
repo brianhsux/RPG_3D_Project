@@ -20,6 +20,9 @@ public class AdventureManager : MonoBehaviour
 
     readonly HashSet<string> _clearedBossKeys = new HashSet<string>();
 
+    /// <summary>True while applying a Host snapshot — skip re-broadcast.</summary>
+    bool _networkSyncing;
+
     public bool IsInVillage => currentWorld == ProgressionFormulas.VillageWorldId;
 
     void Awake()
@@ -125,21 +128,15 @@ public class AdventureManager : MonoBehaviour
 
     public void LoadVillage(bool showBanner = true)
     {
-        currentWorld = ProgressionFormulas.VillageWorldId;
-        currentMap = 1;
-        mapBossDefeated = false;
-        worldPortalReady = false;
+        if (NetPlay.IsClientOnly)
+        {
+            NetAdventureState.RequestTravel(ProgressionFormulas.VillageWorldId, 1);
+            return;
+        }
 
-        if (MapRuntimeBuilder.Instance != null)
-            MapRuntimeBuilder.Instance.BuildVillage();
-
-        PlacePlayerAtVillage();
-
-        if (showBanner && PlayerInventory.Instance != null)
-            PlayerInventory.Instance.ShowLoot("Welcome to the Village");
-
-        if (AccountManager.Instance != null)
-            AccountManager.Instance.SaveActive(silent: true);
+        ApplyLoadVillageLocal(showBanner, fromNetwork: false);
+        if (NetPlay.IsServer && !_networkSyncing)
+            NetAdventureState.PublishFromServer(teleportPlayers: true);
     }
 
     public void ReturnToVillage()
@@ -151,7 +148,7 @@ public class AdventureManager : MonoBehaviour
     public void EnterWorldFromVillage(int world)
     {
         world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
-        if (!HasVisitedWorld(world))
+        if (!NetPlay.IsClientOnly && !HasVisitedWorld(world))
         {
             if (PlayerInventory.Instance != null)
                 PlayerInventory.Instance.ShowLoot($"{ProgressionFormulas.WorldThemeName(world)} portal is sealed");
@@ -159,37 +156,23 @@ public class AdventureManager : MonoBehaviour
         }
 
         LoadWorld(world, 1);
-        if (PlayerInventory.Instance != null)
+        if (!NetPlay.IsClientOnly && PlayerInventory.Instance != null)
             PlayerInventory.Instance.ShowLoot($"Entered {ProgressionFormulas.WorldThemeName(world)}");
-        if (AccountManager.Instance != null)
+        if (!NetPlay.IsClientOnly && AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
     }
 
     public void LoadWorld(int world, int startMap = 1)
     {
-        world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
-        startMap = Mathf.Clamp(startMap, 1, ProgressionFormulas.MapsPerWorld);
-
-        if (world > highestWorldUnlocked)
+        if (NetPlay.IsClientOnly)
         {
-            Debug.Log("World locked.");
+            NetAdventureState.RequestTravel(world, startMap);
             return;
         }
 
-        // Entering a world counts as visiting it.
-        highestWorldUnlocked = Mathf.Max(highestWorldUnlocked, world);
-
-        currentWorld = world;
-        currentMap = startMap;
-        RefreshBossFlags();
-
-        if (MapRuntimeBuilder.Instance != null)
-            MapRuntimeBuilder.Instance.BuildCurrentWorld();
-
-        PlacePlayerInTile(startMap);
-
-        if (AccountManager.Instance != null)
-            AccountManager.Instance.SaveActive(silent: true);
+        ApplyLoadWorldLocal(world, startMap, fromNetwork: false);
+        if (NetPlay.IsServer && !_networkSyncing)
+            NetAdventureState.PublishFromServer(teleportPlayers: true);
     }
 
     public void LoadMap(int world, int map, bool forceRebuild = false)
@@ -205,6 +188,119 @@ public class AdventureManager : MonoBehaviour
         else
             GoToMap(map);
     }
+
+    /// <summary>Host/offline local village build (no ClientRpc).</summary>
+    public void ApplyLoadVillageLocal(bool showBanner, bool fromNetwork)
+    {
+        currentWorld = ProgressionFormulas.VillageWorldId;
+        currentMap = 1;
+        mapBossDefeated = false;
+        worldPortalReady = false;
+
+        if (MapRuntimeBuilder.Instance != null)
+            MapRuntimeBuilder.Instance.BuildVillage();
+
+        if (!fromNetwork)
+            PlacePlayerAtVillage();
+
+        if (showBanner && PlayerInventory.Instance != null)
+            PlayerInventory.Instance.ShowLoot("Welcome to the Village");
+
+        if (!fromNetwork && AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
+        else if (fromNetwork && NetPlay.IsServer && AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
+    }
+
+    /// <summary>Host/offline local world build (no ClientRpc).</summary>
+    public void ApplyLoadWorldLocal(int world, int startMap, bool fromNetwork)
+    {
+        world = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
+        startMap = Mathf.Clamp(startMap, 1, ProgressionFormulas.MapsPerWorld);
+
+        if (world > highestWorldUnlocked)
+        {
+            bool portalAdvance = fromNetwork && world == currentWorld + 1 && worldPortalReady;
+            if (!portalAdvance)
+            {
+                Debug.Log("World locked.");
+                return;
+            }
+        }
+
+        highestWorldUnlocked = Mathf.Max(highestWorldUnlocked, world);
+        currentWorld = world;
+        currentMap = startMap;
+        RefreshBossFlags();
+
+        if (MapRuntimeBuilder.Instance != null)
+            MapRuntimeBuilder.Instance.BuildCurrentWorld();
+
+        if (!fromNetwork)
+            PlacePlayerInTile(startMap);
+
+        if (AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
+    }
+
+    /// <summary>Pure client: rebuild geometry + flags from Host snapshot.</summary>
+    public void ApplyNetworkSnapshot(int world, int map, int highest, string clearedCsv)
+    {
+        _networkSyncing = true;
+        try
+        {
+            ImportClearedBossKeysCsv(clearedCsv);
+            highestWorldUnlocked = Mathf.Clamp(highest, 1, ProgressionFormulas.WorldCount);
+
+            if (world == ProgressionFormulas.VillageWorldId)
+            {
+                currentWorld = ProgressionFormulas.VillageWorldId;
+                currentMap = 1;
+                mapBossDefeated = false;
+                worldPortalReady = false;
+                if (MapRuntimeBuilder.Instance != null)
+                    MapRuntimeBuilder.Instance.BuildVillage();
+            }
+            else
+            {
+                currentWorld = Mathf.Clamp(world, 1, ProgressionFormulas.WorldCount);
+                currentMap = Mathf.Clamp(map, 1, ProgressionFormulas.MapsPerWorld);
+                RefreshBossFlags();
+                if (MapRuntimeBuilder.Instance != null)
+                    MapRuntimeBuilder.Instance.BuildCurrentWorld();
+            }
+        }
+        finally
+        {
+            _networkSyncing = false;
+        }
+    }
+
+    public string ExportClearedBossKeysCsv()
+    {
+        if (_clearedBossKeys.Count == 0) return "";
+        var keys = new string[_clearedBossKeys.Count];
+        _clearedBossKeys.CopyTo(keys);
+        return string.Join(",", keys);
+    }
+
+    public void ImportClearedBossKeysCsv(string csv)
+    {
+        _clearedBossKeys.Clear();
+        if (!string.IsNullOrEmpty(csv))
+        {
+            var parts = csv.Split(',');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var key = parts[i] != null ? parts[i].Trim() : null;
+                if (!string.IsNullOrEmpty(key))
+                    _clearedBossKeys.Add(key);
+            }
+        }
+        RefreshBossFlags();
+    }
+
+    public void RefreshBossFlagsPublic() => RefreshBossFlags();
 
     void RefreshBossFlags()
     {
@@ -239,18 +335,40 @@ public class AdventureManager : MonoBehaviour
 
     void PlacePlayerInTile(int map)
     {
-        var player = GameObject.FindGameObjectWithTag("Player");
-        if (player == null || MapRuntimeBuilder.Instance == null) return;
-
+        if (MapRuntimeBuilder.Instance == null) return;
         Vector3 pos = MapRuntimeBuilder.Instance.GetTileSpawn(map);
-        PlacePlayerAt(player, pos);
+        PlaceLocalPlayer(pos);
     }
 
     void PlacePlayerAtVillage()
     {
-        var player = GameObject.FindGameObjectWithTag("Player");
-        if (player == null || MapRuntimeBuilder.Instance == null) return;
-        PlacePlayerAt(player, MapRuntimeBuilder.Instance.GetVillageSpawn());
+        if (MapRuntimeBuilder.Instance == null) return;
+        PlaceLocalPlayer(MapRuntimeBuilder.Instance.GetVillageSpawn());
+    }
+
+    void PlaceLocalPlayer(Vector3 pos)
+    {
+        if (NetPlay.IsNetworking)
+        {
+            NetAdventureState.TeleportOwnedNetworkPlayer(pos);
+            return;
+        }
+
+        var player = FindSoloPlayer();
+        if (player == null) return;
+        PlacePlayerAt(player, pos);
+    }
+
+    static GameObject FindSoloPlayer()
+    {
+        var players = GameObject.FindGameObjectsWithTag("Player");
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (players[i] == null) continue;
+            if (players[i].GetComponent<NetworkPlayer>() != null) continue;
+            return players[i];
+        }
+        return players.Length > 0 ? players[0] : null;
     }
 
     static void PlacePlayerAt(GameObject player, Vector3 pos)
@@ -305,9 +423,17 @@ public class AdventureManager : MonoBehaviour
 
     public void EnterNextWorld()
     {
-        if (!worldPortalReady || IsInVillage) return;
+        if (IsInVillage) return;
         int next = currentWorld + 1;
         if (next > ProgressionFormulas.WorldCount) return;
+
+        if (NetPlay.IsClientOnly)
+        {
+            NetAdventureState.RequestTravel(next, 1);
+            return;
+        }
+
+        if (!worldPortalReady) return;
         highestWorldUnlocked = Mathf.Max(highestWorldUnlocked, next);
         LoadWorld(next, 1);
         if (PlayerInventory.Instance != null)

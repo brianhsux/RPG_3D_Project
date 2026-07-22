@@ -6,8 +6,9 @@ public class MapExitTrigger : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        if (!MapTriggerUtil.IsLocalAdventureActor(other)) return;
         if (AdventureManager.Instance == null) return;
+        // Tile hops stay personal (party can split across the open world).
         AdventureManager.Instance.GoToMap(targetMap);
     }
 }
@@ -21,7 +22,7 @@ public class MapTileZone : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        if (!MapTriggerUtil.IsLocalAdventureActor(other)) return;
         if (AdventureManager.Instance == null) return;
         AdventureManager.Instance.EnterTile(mapIndex);
     }
@@ -31,8 +32,16 @@ public class WorldPortalTrigger : MonoBehaviour
 {
     void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        if (!MapTriggerUtil.IsLocalAdventureActor(other)) return;
         if (AdventureManager.Instance == null) return;
+
+        if (NetPlay.IsNetworking)
+        {
+            int next = AdventureManager.Instance.currentWorld + 1;
+            NetAdventureState.RequestTravel(next, 1);
+            return;
+        }
+
         AdventureManager.Instance.EnterNextWorld();
     }
 }
@@ -44,8 +53,15 @@ public class VillageWorldPortalTrigger : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        if (!MapTriggerUtil.IsLocalAdventureActor(other)) return;
         if (AdventureManager.Instance == null) return;
+
+        if (NetPlay.IsNetworking)
+        {
+            NetAdventureState.RequestTravel(targetWorld, 1);
+            return;
+        }
+
         AdventureManager.Instance.EnterWorldFromVillage(targetWorld);
     }
 }
@@ -55,9 +71,54 @@ public class VillageReturnTrigger : MonoBehaviour
 {
     void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        if (!MapTriggerUtil.IsLocalAdventureActor(other)) return;
         if (AdventureManager.Instance == null) return;
+
+        if (NetPlay.IsNetworking)
+        {
+            NetAdventureState.RequestTravel(ProgressionFormulas.VillageWorldId, 1);
+            return;
+        }
+
         AdventureManager.Instance.ReturnToVillage();
+    }
+}
+
+/// <summary>Shared helpers so only the local hero / owned NetworkPlayer trips portals.</summary>
+public static class MapTriggerUtil
+{
+    public static bool IsLocalAdventureActor(Collider other)
+    {
+        if (other == null || !other.CompareTag("Player")) return false;
+
+        var np = other.GetComponentInParent<NetworkPlayer>();
+        if (NetPlay.IsNetworking)
+            return np != null && np.IsOwner;
+
+        return np == null;
+    }
+
+    public static Transform FindLocalPlayerTransform()
+    {
+        if (NetPlay.IsNetworking)
+        {
+            var players = Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (players[i] != null && players[i].IsOwner)
+                    return players[i].transform;
+            }
+            return null;
+        }
+
+        var tagged = GameObject.FindGameObjectsWithTag("Player");
+        for (int i = 0; i < tagged.Length; i++)
+        {
+            if (tagged[i] == null) continue;
+            if (tagged[i].GetComponent<NetworkPlayer>() != null) continue;
+            return tagged[i].transform;
+        }
+        return tagged.Length > 0 ? tagged[0].transform : null;
     }
 }
 
@@ -83,7 +144,6 @@ public class WorldPortalLabel : MonoBehaviour
         }
         else
         {
-            // Adventure: hub return (id 0) or explicit next-world label
             if (worldId != 0 && !showInAdventure) return;
         }
 
@@ -93,9 +153,9 @@ public class WorldPortalLabel : MonoBehaviour
         Vector3 screen = cam.WorldToScreenPoint(transform.position + Vector3.up * 2.6f);
         if (screen.z < 0.5f) return;
 
-        var player = GameObject.FindGameObjectWithTag("Player");
+        var player = MapTriggerUtil.FindLocalPlayerTransform();
         if (player == null) return;
-        if (Vector3.Distance(player.transform.position, transform.position) > 18f) return;
+        if (Vector3.Distance(player.position, transform.position) > 18f) return;
 
         RPGUI.Ensure();
         float w = 240f;

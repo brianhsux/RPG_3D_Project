@@ -119,6 +119,12 @@ public class NetCombatSession : MonoBehaviour
     {
         if (!NetPlay.IsServer) return;
         if (MapRuntimeBuilder.Instance == null) return;
+        if (AdventureManager.Instance != null && AdventureManager.Instance.IsInVillage)
+        {
+            DespawnAllAdventureEnemies();
+            DestroyLocalOnlyEnemies();
+            return;
+        }
 
         DespawnAllAdventureEnemies();
         DestroyLocalOnlyEnemies();

@@ -104,6 +104,7 @@ public class NetBootstrap : MonoBehaviour
 
         AssignPlayerPrefab(nm);
         EnsureCombatSession().RegisterPrefabs(nm);
+        NetAdventureState.RegisterPrefab(nm);
         HookCallbacks(nm);
     }
 
@@ -165,6 +166,8 @@ public class NetBootstrap : MonoBehaviour
     void OnClientConnected(ulong clientId)
     {
         Debug.Log($"[NGO] Client connected: {clientId} (local={NetworkManager.LocalClientId})");
+        if (NetworkManager != null && NetworkManager.IsServer)
+            NetAdventureState.SyncClient(clientId);
     }
 
     void OnClientDisconnected(ulong clientId)
@@ -193,6 +196,7 @@ public class NetBootstrap : MonoBehaviour
             return false;
         }
         EnsureCombatSession().OnHostStarted();
+        NetAdventureState.SpawnOnServer();
         return true;
     }
 
@@ -218,6 +222,8 @@ public class NetBootstrap : MonoBehaviour
     public void Shutdown()
     {
         EnsureCombatSession().OnShutdown();
+        if (NetPlay.IsServer)
+            NetAdventureState.DespawnIfServer();
         var nm = NetworkManager;
         if (nm != null && (nm.IsListening || nm.IsClient))
         {

@@ -99,7 +99,7 @@ public class NetHud : MonoBehaviour
             }
 
             RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH),
-                "LMB/F · gear stats · killer loot · mobs respawn", RPGUI.FieldTag);
+                "LMB/F · shared map portals · killer loot", RPGUI.FieldTag);
         }
     }
 
