@@ -307,15 +307,29 @@ public class PlayerPetController : MonoBehaviour
             return;
         }
 
+        Transform follow = transform;
+        if (NetPlay.IsNetworking)
+        {
+            var players = Object.FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (players[i] != null && players[i].IsOwner)
+                {
+                    follow = players[i].transform;
+                    break;
+                }
+            }
+        }
+
         if (_follower == null)
         {
             var go = new GameObject("ActivePet");
-            go.transform.position = transform.position - transform.forward * 2f + transform.right * 0.6f;
+            go.transform.position = follow.position - follow.forward * 2f + follow.right * 0.6f;
             _follower = go.AddComponent<PetFollower>();
         }
 
         if (_stats == null) _stats = GetComponent<CharacterStats>();
-        _follower.Bind(transform, _stats, pet);
+        _follower.Bind(follow, _stats, pet);
     }
 
     void DespawnFollower()

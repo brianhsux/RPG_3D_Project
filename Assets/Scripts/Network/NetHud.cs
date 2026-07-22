@@ -12,6 +12,9 @@ public class NetHud : MonoBehaviour
 
     public bool showPanel = true;
 
+    string _addressField = NetBootstrap.DefaultAddress;
+    string _portField = NetBootstrap.DefaultPort.ToString();
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void AutoSpawn()
     {
@@ -34,6 +37,13 @@ public class NetHud : MonoBehaviour
             gameObject.AddComponent<NetBootstrap>();
         if (GetComponent<NetCombatSession>() == null)
             gameObject.AddComponent<NetCombatSession>();
+
+        var boot = NetBootstrap.Instance;
+        if (boot != null)
+        {
+            _addressField = boot.connectAddress;
+            _portField = boot.connectPort.ToString();
+        }
     }
 
     void OnDestroy()
@@ -58,8 +68,12 @@ public class NetHud : MonoBehaviour
         var boot = NetBootstrap.Instance;
         if (boot == null) return;
 
-        float w = 340f;
-        float h = boot.IsNetworking ? 200f : 168f;
+        bool busy = boot.IsNetworking;
+        float w = 360f;
+        float h = busy ? 236f : 248f;
+        if (!string.IsNullOrEmpty(boot.LastMessage))
+            h += 28f;
+
         Rect panel = new Rect(16f, Screen.height - h - 16f, w, h);
         RPGUI.DrawPanel(panel, RPGUI.PanelBg);
 
@@ -70,20 +84,43 @@ public class NetHud : MonoBehaviour
         RPGUI.DrawText(new Rect(x, y, tw, RPGUI.HintH), "Multiplayer (NGO)  ·  N hide", RPGUI.Hint);
         y += RPGUI.HintH + 2f;
         RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH), boot.StatusLabel, RPGUI.FieldTag);
-        y += RPGUI.FieldTagH + 8f;
+        y += RPGUI.FieldTagH + 4f;
 
-        bool busy = boot.IsNetworking;
+        string loc = AdventureLocationLabel();
+        if (!string.IsNullOrEmpty(loc))
+        {
+            RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH), loc, RPGUI.FieldTag);
+            y += RPGUI.FieldTagH + 6f;
+        }
+        else
+            y += 4f;
+
         float btnW = (tw - 8f) * 0.5f;
 
         if (!busy)
         {
+            RPGUI.DrawText(new Rect(x, y, 70f, RPGUI.FieldTagH), "IP", RPGUI.FieldTag);
+            _addressField = GUI.TextField(new Rect(x + 70f, y, tw - 70f, 28f), _addressField ?? "");
+            y += 34f;
+            RPGUI.DrawText(new Rect(x, y, 70f, RPGUI.FieldTagH), "Port", RPGUI.FieldTag);
+            _portField = GUI.TextField(new Rect(x + 70f, y, tw - 70f, 28f), _portField ?? "");
+            y += 36f;
+
+            ApplyConnectionFields(boot);
+
             if (RPGUI.ButtonSm(new Rect(x, y, btnW, RPGUI.ButtonSmH), "Host", true))
+            {
+                ApplyConnectionFields(boot);
                 boot.StartHost();
+            }
             if (RPGUI.ButtonSm(new Rect(x + btnW + 8f, y, btnW, RPGUI.ButtonSmH), "Client"))
+            {
+                ApplyConnectionFields(boot);
                 boot.StartClient();
+            }
             y += RPGUI.ButtonSmH + 8f;
             RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH),
-                $"{boot.connectAddress}:{boot.connectPort}", RPGUI.FieldTag);
+                "Host first, then Client joins IP:Port", RPGUI.FieldTag);
         }
         else
         {
@@ -99,8 +136,34 @@ public class NetHud : MonoBehaviour
             }
 
             RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH),
-                "LMB/F · shared map portals · killer loot", RPGUI.FieldTag);
+                "E challenge · pets hit · shared portals", RPGUI.FieldTag);
         }
+
+        if (!string.IsNullOrEmpty(boot.LastMessage))
+        {
+            y += RPGUI.FieldTagH + 8f;
+            RPGUI.DrawText(new Rect(x, y, tw, RPGUI.HintH), boot.LastMessage, RPGUI.Hint);
+        }
+    }
+
+    void ApplyConnectionFields(NetBootstrap boot)
+    {
+        boot.connectAddress = string.IsNullOrWhiteSpace(_addressField)
+            ? NetBootstrap.DefaultAddress
+            : _addressField.Trim();
+
+        if (!ushort.TryParse(_portField, out ushort port) || port == 0)
+            port = NetBootstrap.DefaultPort;
+        boot.connectPort = port;
+        _portField = port.ToString();
+    }
+
+    static string AdventureLocationLabel()
+    {
+        var adv = AdventureManager.Instance;
+        if (adv == null || !NetPlay.IsNetworking) return null;
+        if (adv.IsInVillage) return "Map · Village";
+        return $"Map · W{adv.currentWorld} M{adv.currentMap} · Lv{adv.ContentLevel}";
     }
 
     static string LocalHpLabel()

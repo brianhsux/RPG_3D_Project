@@ -43,6 +43,11 @@ public class PetFollower : MonoBehaviour
 
         if (_ownerStats != null && _ownerStats.isDead)
             return;
+        if (NetPlay.IsNetworking)
+        {
+            var combat = _owner.GetComponent<NetworkPlayerCombat>();
+            if (combat != null && !combat.IsAlive) return;
+        }
 
         float followDist = PetCatalog.FollowDistance(kind);
         Vector3 behind = _owner.position - _owner.forward * followDist + Vector3.up * 0.15f;
@@ -75,9 +80,50 @@ public class PetFollower : MonoBehaviour
 
     void TryAttack()
     {
-        if (_attackCd > 0f || _ownerStats == null) return;
+        if (_attackCd > 0f || _ownerStats == null || _owner == null) return;
 
         float range = PetCatalog.AttackRange(kind);
+        float playerAtk = _ownerStats.attackDamage;
+        var pet = PlayerPetController.Instance != null ? PlayerPetController.Instance.ActivePet : null;
+        float dmg = PetCatalog.ComputeDamage(pet, playerAtk);
+        if (kind == PetKind.ShadowWolf && Random.value < 0.18f)
+            dmg *= 1.6f;
+
+        if (NetPlay.IsNetworking)
+        {
+            NetworkEnemy netBest = null;
+            float netBestDist = range;
+            var netEnemies = FindObjectsByType<NetworkEnemy>(FindObjectsSortMode.None);
+            for (int i = 0; i < netEnemies.Length; i++)
+            {
+                var e = netEnemies[i];
+                if (e == null || !e.IsAlive) continue;
+                float d = Vector3.Distance(transform.position, e.transform.position);
+                float toPlayer = Vector3.Distance(e.transform.position, _owner.position);
+                if (toPlayer > range + 4f) continue;
+                if (d <= range && d < netBestDist)
+                {
+                    netBestDist = d;
+                    netBest = e;
+                }
+            }
+
+            if (netBest == null) return;
+
+            Vector3 face = netBest.transform.position - transform.position;
+            face.y = 0f;
+            if (face.sqrMagnitude > 0.01f)
+                transform.rotation = Quaternion.LookRotation(face);
+
+            var combat = _owner.GetComponent<NetworkPlayerCombat>();
+            if (combat == null || !combat.IsOwner)
+                combat = FindOwnedCombat();
+            combat?.RequestPetAttack(netBest, dmg);
+            _attackCd = PetCatalog.AttackCooldown(kind);
+            transform.position += transform.forward * 0.25f;
+            return;
+        }
+
         CharacterStats best = null;
         float bestDist = range;
         var enemies = FindObjectsByType<CharacterStats>(FindObjectsSortMode.None);
@@ -85,7 +131,6 @@ public class PetFollower : MonoBehaviour
         {
             if (e == null || e.isPlayer || e.isDead) continue;
             float d = Vector3.Distance(transform.position, e.transform.position);
-            // Also require reasonably near the player so pet doesn't leash across the map
             float toPlayer = Vector3.Distance(e.transform.position, _owner.position);
             if (toPlayer > range + 4f) continue;
             if (d <= range && d < bestDist)
@@ -97,26 +142,25 @@ public class PetFollower : MonoBehaviour
 
         if (best == null) return;
 
-        Vector3 face = best.transform.position - transform.position;
-        face.y = 0f;
-        if (face.sqrMagnitude > 0.01f)
-            transform.rotation = Quaternion.LookRotation(face);
-
-        float playerAtk = _ownerStats.attackDamage;
-        var pet = PlayerPetController.Instance != null ? PlayerPetController.Instance.ActivePet : null;
-        float dmg = PetCatalog.ComputeDamage(pet, playerAtk);
-
-        // Shadow Wolf: small crit chance
-        if (kind == PetKind.ShadowWolf && Random.value < 0.18f)
-            dmg *= 1.6f;
-
-        // Ember Fox: fire flavor (already in formula); Storm Hawk: slight bonus vs full HP optional — skip
+        Vector3 faceSolo = best.transform.position - transform.position;
+        faceSolo.y = 0f;
+        if (faceSolo.sqrMagnitude > 0.01f)
+            transform.rotation = Quaternion.LookRotation(faceSolo);
 
         best.TakeDamage(dmg, _ownerStats);
         _attackCd = PetCatalog.AttackCooldown(kind);
-
-        // Tiny lunge
         transform.position += transform.forward * 0.25f;
+    }
+
+    static NetworkPlayerCombat FindOwnedCombat()
+    {
+        var combats = Object.FindObjectsByType<NetworkPlayerCombat>(FindObjectsSortMode.None);
+        for (int i = 0; i < combats.Length; i++)
+        {
+            if (combats[i] != null && combats[i].IsSpawned && combats[i].IsOwner)
+                return combats[i];
+        }
+        return null;
     }
 }
 

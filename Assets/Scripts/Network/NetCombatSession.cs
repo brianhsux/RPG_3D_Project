@@ -171,7 +171,8 @@ public class NetCombatSession : MonoBehaviour
         int mapIndex,
         float moveSpeed,
         float leashRadius,
-        bool allowRespawn = true)
+        bool allowRespawn = true,
+        bool isChallengeEnemy = false)
     {
         if (!NetPlay.IsServer) return null;
 
@@ -199,7 +200,8 @@ public class NetCombatSession : MonoBehaviour
         }
 
         enemy.ConfigureAdventureBeforeSpawn(
-            kind, level, isBoss, mapIndex, zoneCenter, moveSpeed, leashRadius, pos, name, allowRespawn);
+            kind, level, isBoss, mapIndex, zoneCenter, moveSpeed, leashRadius,
+            pos, name, allowRespawn, isChallengeEnemy);
 
         var no = go.GetComponent<NetworkObject>();
         if (no == null)

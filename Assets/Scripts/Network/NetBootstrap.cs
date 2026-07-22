@@ -21,6 +21,9 @@ public class NetBootstrap : MonoBehaviour
     public string connectAddress = DefaultAddress;
     public ushort connectPort = DefaultPort;
 
+    /// <summary>Short status / error line shown in NetHud.</summary>
+    public string LastMessage { get; private set; } = "";
+
     NetworkManager _nm;
     bool _soloPlayerSuspended;
     GameObject _runtimePlayerTemplate;
@@ -167,14 +170,32 @@ public class NetBootstrap : MonoBehaviour
     {
         Debug.Log($"[NGO] Client connected: {clientId} (local={NetworkManager.LocalClientId})");
         if (NetworkManager != null && NetworkManager.IsServer)
+        {
+            if (clientId == NetworkManager.LocalClientId)
+                LastMessage = "Hosting — waiting for clients";
+            else
+                LastMessage = $"Peer joined · id {clientId}";
             NetAdventureState.SyncClient(clientId);
+        }
+        else if (NetworkManager != null && NetworkManager.IsClient)
+        {
+            LastMessage = "Connected to Host";
+        }
     }
 
     void OnClientDisconnected(ulong clientId)
     {
         Debug.Log($"[NGO] Client disconnected: {clientId}");
-        if (NetworkManager != null && !NetworkManager.IsListening && !NetworkManager.IsClient)
+        var nm = NetworkManager;
+        if (nm != null && nm.IsServer && clientId != nm.LocalClientId)
+            LastMessage = $"Peer left · id {clientId}";
+
+        if (nm != null && !nm.IsListening && !nm.IsClient)
+        {
+            if (string.IsNullOrEmpty(LastMessage) || LastMessage.StartsWith("Connected") || LastMessage.StartsWith("Hosting"))
+                LastMessage = "Disconnected";
             RestoreSoloPlayer();
+        }
     }
 
     public bool StartHost()
@@ -183,6 +204,7 @@ public class NetBootstrap : MonoBehaviour
         ConfigureNetworkManager(_nm);
         if (_nm.NetworkConfig.PlayerPrefab == null)
         {
+            LastMessage = "Host failed — PlayerPrefab missing";
             Debug.LogError("[NetBootstrap] Cannot Host — PlayerPrefab missing.");
             return false;
         }
@@ -192,9 +214,11 @@ public class NetBootstrap : MonoBehaviour
         Debug.Log(ok ? "[NGO] StartHost OK" : "[NGO] StartHost failed");
         if (!ok)
         {
+            LastMessage = "Host failed — port in use?";
             RestoreSoloPlayer();
             return false;
         }
+        LastMessage = "Hosting…";
         EnsureCombatSession().OnHostStarted();
         NetAdventureState.SpawnOnServer();
         return true;
@@ -206,16 +230,22 @@ public class NetBootstrap : MonoBehaviour
         ConfigureNetworkManager(_nm);
         if (_nm.NetworkConfig.PlayerPrefab == null)
         {
+            LastMessage = "Client failed — PlayerPrefab missing";
             Debug.LogError("[NetBootstrap] Cannot Client — PlayerPrefab missing.");
             return false;
         }
 
         SuspendSoloPlayer();
+        LastMessage = $"Connecting {connectAddress}:{connectPort}…";
         bool ok = _nm.StartClient();
         Debug.Log(ok
             ? $"[NGO] StartClient → {connectAddress}:{connectPort}"
             : "[NGO] StartClient failed");
-        if (!ok) RestoreSoloPlayer();
+        if (!ok)
+        {
+            LastMessage = "Client failed to start";
+            RestoreSoloPlayer();
+        }
         return ok;
     }
 
@@ -230,6 +260,7 @@ public class NetBootstrap : MonoBehaviour
             nm.Shutdown();
             Debug.Log("[NGO] Shutdown");
         }
+        LastMessage = "Disconnected";
         RestoreSoloPlayer();
     }
 

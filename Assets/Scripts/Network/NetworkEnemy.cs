@@ -54,10 +54,13 @@ public class NetworkEnemy : NetworkBehaviour
     Vector3 _pendingSpawnPos;
     string _pendingName;
     bool _pendingAllowRespawn = true;
+    bool _pendingChallenge;
     bool _adventureEnemy;
+    bool _isChallengeEnemy;
     ulong _lastAttackerClientId = ulong.MaxValue;
 
     public bool IsAlive => IsSpawned && !_despawning && CurrentHp.Value > 0f;
+    public bool IsChallengeEnemy => _isChallengeEnemy;
 
     void Awake()
     {
@@ -74,7 +77,8 @@ public class NetworkEnemy : NetworkBehaviour
         float leashRadius,
         Vector3 spawnPos,
         string spawnName,
-        bool allowRespawn = true)
+        bool allowRespawn = true,
+        bool isChallengeEnemy = false)
     {
         _pendingConfigure = true;
         _adventureEnemy = true;
@@ -88,12 +92,14 @@ public class NetworkEnemy : NetworkBehaviour
         _pendingSpawnPos = spawnPos;
         _pendingName = spawnName;
         _pendingAllowRespawn = allowRespawn;
+        _pendingChallenge = isChallengeEnemy;
         _homeCenter = homeCenter;
         _spawnPos = spawnPos;
         _spawnName = spawnName;
         _moveSpeed = moveSpeed;
         _leashRadius = leashRadius;
         _allowRespawn = allowRespawn;
+        _isChallengeEnemy = isChallengeEnemy;
     }
 
     public override void OnNetworkSpawn()
@@ -129,6 +135,7 @@ public class NetworkEnemy : NetworkBehaviour
         _moveSpeed = _pendingMove;
         _leashRadius = _pendingLeash;
         _allowRespawn = _pendingAllowRespawn;
+        _isChallengeEnemy = _pendingChallenge;
         _adventureEnemy = true;
 
         float maxHp = ProgressionFormulas.MobMaxHp(_pendingLevel, _pendingBoss);
@@ -234,29 +241,51 @@ public class NetworkEnemy : NetworkBehaviour
         DamageNumbers.Spawn(transform.position, amount, false, isBoss);
     }
 
+    /// <summary>Host-only: scale HP/ATK after spawn config (challenge elites).</summary>
+    public void ApplyCombatMultipliersServer(float hpMul, float atkMul, float scaleMul = 1f)
+    {
+        if (!IsServer) return;
+        hpMul = Mathf.Max(0.1f, hpMul);
+        atkMul = Mathf.Max(0.1f, atkMul);
+        MaxHp.Value = Mathf.Max(1f, MaxHp.Value * hpMul);
+        CurrentHp.Value = MaxHp.Value;
+        _attackDamage = Mathf.Max(1f, _attackDamage * atkMul);
+        if (scaleMul > 1.01f)
+            transform.localScale *= scaleMul;
+    }
+
     void BeginDespawn()
     {
         if (!IsServer || _despawning) return;
         _despawning = true;
 
-        GrantRewardsToKillerServer();
-        OnEnemyKilledClientRpc(IsBoss.Value, MapIndex.Value, ContentLevel.Value, KindId.Value);
-
-        if (_adventureEnemy && _allowRespawn && NetCombatSession.Instance != null)
+        if (_isChallengeEnemy)
         {
-            NetCombatSession.Instance.ScheduleRespawn(new NetCombatSession.EnemySpawnSpec
+            if (ChallengeAltar.Active != null)
+                ChallengeAltar.Active.NotifyNetworkEnemyKilled(this);
+            OnEnemyKilledClientRpc(false, MapIndex.Value, ContentLevel.Value, KindId.Value, true);
+        }
+        else
+        {
+            GrantRewardsToKillerServer();
+            OnEnemyKilledClientRpc(IsBoss.Value, MapIndex.Value, ContentLevel.Value, KindId.Value, false);
+
+            if (_adventureEnemy && _allowRespawn && NetCombatSession.Instance != null)
             {
-                name = _spawnName,
-                pos = _spawnPos,
-                zoneCenter = _homeCenter,
-                level = ContentLevel.Value,
-                isBoss = IsBoss.Value,
-                kind = (EnemyKind)KindId.Value,
-                mapIndex = MapIndex.Value,
-                moveSpeed = _moveSpeed,
-                leashRadius = _leashRadius,
-                allowRespawn = true
-            });
+                NetCombatSession.Instance.ScheduleRespawn(new NetCombatSession.EnemySpawnSpec
+                {
+                    name = _spawnName,
+                    pos = _spawnPos,
+                    zoneCenter = _homeCenter,
+                    level = ContentLevel.Value,
+                    isBoss = IsBoss.Value,
+                    kind = (EnemyKind)KindId.Value,
+                    mapIndex = MapIndex.Value,
+                    moveSpeed = _moveSpeed,
+                    leashRadius = _leashRadius,
+                    allowRespawn = true
+                });
+            }
         }
 
         var no = NetworkObject;
@@ -326,7 +355,7 @@ public class NetworkEnemy : NetworkBehaviour
     }
 
     [ClientRpc]
-    void OnEnemyKilledClientRpc(bool isBoss, int mapIndex, int contentLevel, int kindId)
+    void OnEnemyKilledClientRpc(bool isBoss, int mapIndex, int contentLevel, int kindId, bool isChallenge)
     {
         if (AdventureManager.Instance == null) return;
 
@@ -337,6 +366,7 @@ public class NetworkEnemy : NetworkBehaviour
         stats.mapIndex = mapIndex;
         stats.contentLevel = contentLevel;
         stats.enemyKind = (EnemyKind)kindId;
+        stats.isChallengeEnemy = isChallenge;
         stats.isDead = true;
         AdventureManager.Instance.NotifyEnemyDied(stats);
         Destroy(tmp);

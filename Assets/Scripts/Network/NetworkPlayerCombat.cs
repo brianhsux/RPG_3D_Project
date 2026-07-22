@@ -98,6 +98,9 @@ public class NetworkPlayerCombat : NetworkBehaviour
             PushLocalStatsToServer();
         }
 
+        if (IsOwner)
+            TryChallengeInteractInput();
+
         if (!IsOwner || !IsAlive) return;
         if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel)
             return;
@@ -112,6 +115,17 @@ public class NetworkPlayerCombat : NetworkBehaviour
 
         _clientNextAttackTime = Time.time + cd;
         AttackServerRpc();
+    }
+
+    void TryChallengeInteractInput()
+    {
+        var kb = Keyboard.current;
+        if (kb == null || !kb.eKey.wasPressedThisFrame) return;
+        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel) return;
+
+        var altar = ChallengeAltar.FindNearest(transform.position, ChallengeAltar.InteractRange);
+        if (altar != null)
+            altar.TryInteract();
     }
 
     public void PushLocalStatsToServer()
@@ -336,5 +350,114 @@ public class NetworkPlayerCombat : NetworkBehaviour
         mat.color = c;
         if (mat.HasProperty("_BaseColor"))
             mat.SetColor("_BaseColor", c);
+    }
+
+    // ── Challenge altar (Host-authoritative) ───────────────────────────
+
+    public static void RequestStartChallenge(ChallengeAltar altar, ChallengeAltar.Difficulty difficulty)
+    {
+        if (altar == null) return;
+        var local = FindOwnedCombat();
+        if (local == null)
+        {
+            altar.HostStartChallenge(difficulty);
+            return;
+        }
+        local.StartChallengeServerRpc((int)difficulty);
+    }
+
+    public static void BroadcastChallengeHudServer(int state, string status, int difficulty, float cooldownLeft)
+    {
+        if (!NetPlay.IsServer) return;
+        var host = FindAnySpawnedCombat();
+        host?.ChallengeHudClientRpc(state, status ?? "", difficulty, cooldownLeft);
+    }
+
+    public static void BroadcastChallengeLootServer(string message)
+    {
+        if (!NetPlay.IsServer) return;
+        var host = FindAnySpawnedCombat();
+        host?.ChallengeLootClientRpc(message ?? "");
+    }
+
+    public static void DeliverChallengeRewardsToAllServer(
+        int xp, string gemJson, string gem2Json, bool givePet, int petKind, int petLv, string banner)
+    {
+        if (!NetPlay.IsServer) return;
+        var combats = FindObjectsByType<NetworkPlayerCombat>(FindObjectsSortMode.None);
+        NetworkPlayerCombat any = null;
+        for (int i = 0; i < combats.Length; i++)
+        {
+            var c = combats[i];
+            if (c == null || !c.IsSpawned) continue;
+            any = c;
+            c.DeliverKillRewardsServer(xp, gemJson, gem2Json, givePet, petKind, petLv, c.transform.position, true);
+        }
+        if (any != null && !string.IsNullOrEmpty(banner))
+            any.ChallengeLootClientRpc(banner);
+    }
+
+    [ServerRpc]
+    void StartChallengeServerRpc(int difficulty)
+    {
+        var altar = ChallengeAltar.FindNearest(transform.position, ChallengeAltar.InteractRange + 8f)
+                    ?? ChallengeAltar.Active
+                    ?? Object.FindFirstObjectByType<ChallengeAltar>();
+        if (altar == null) return;
+        altar.HostStartChallenge((ChallengeAltar.Difficulty)Mathf.Clamp(difficulty, 0, 2));
+    }
+
+    [ClientRpc]
+    void ChallengeHudClientRpc(int state, string status, int difficulty, float cooldownLeft)
+    {
+        if (IsServer) return; // Host already owns the sim
+        var altar = ChallengeAltar.Active ?? Object.FindFirstObjectByType<ChallengeAltar>();
+        altar?.ApplyRemoteHud(state, status, difficulty, cooldownLeft);
+    }
+
+    [ClientRpc]
+    public void ChallengeLootClientRpc(string message)
+    {
+        if (PlayerInventory.Instance != null && !string.IsNullOrEmpty(message))
+            PlayerInventory.Instance.ShowLoot(message);
+    }
+
+    // ── Pet attacks ────────────────────────────────────────────────────
+
+    public void RequestPetAttack(NetworkEnemy enemy, float damage)
+    {
+        if (!IsOwner || !IsSpawned || enemy == null) return;
+        PetAttackServerRpc(enemy.NetworkObject, damage);
+    }
+
+    [ServerRpc]
+    void PetAttackServerRpc(NetworkObjectReference enemyRef, float damage)
+    {
+        if (!enemyRef.TryGet(out NetworkObject no) || no == null) return;
+        var enemy = no.GetComponent<NetworkEnemy>();
+        if (enemy == null || !enemy.IsAlive) return;
+        enemy.ApplyDamageServer(Mathf.Max(1f, damage), OwnerClientId);
+    }
+
+    static NetworkPlayerCombat FindOwnedCombat()
+    {
+        var combats = Object.FindObjectsByType<NetworkPlayerCombat>(FindObjectsSortMode.None);
+        for (int i = 0; i < combats.Length; i++)
+        {
+            if (combats[i] != null && combats[i].IsSpawned && combats[i].IsOwner)
+                return combats[i];
+        }
+        return null;
+    }
+
+    static NetworkPlayerCombat FindAnySpawnedCombat()
+    {
+        var combats = Object.FindObjectsByType<NetworkPlayerCombat>(FindObjectsSortMode.None);
+        for (int i = 0; i < combats.Length; i++)
+        {
+            if (combats[i] != null && combats[i].IsSpawned)
+                return combats[i];
+        }
+        return null;
     }
 }

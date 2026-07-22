@@ -983,8 +983,25 @@ public class MapRuntimeBuilder : MonoBehaviour
     /// <summary>Spawns a non-respawning challenge mob (used by ChallengeAltar waves).</summary>
     public GameObject SpawnChallengeEnemy(string name, Vector3 pos, Vector3 zoneCenter, int level, bool isBoss, EnemyKind kind, int mapIndex)
     {
-        // Challenge waves stay local for now; pure clients skip to avoid duplicates.
         if (NetPlay.IsClientOnly) return null;
+
+        if (NetPlay.IsServer)
+        {
+            float move = ProgressionFormulas.MobMoveSpeed(level, isBoss);
+            var session = NetCombatSession.Instance;
+            if (session == null && NetBootstrap.Instance != null)
+            {
+                session = NetBootstrap.Instance.GetComponent<NetCombatSession>()
+                          ?? NetBootstrap.Instance.gameObject.AddComponent<NetCombatSession>();
+            }
+            if (session != null)
+            {
+                return session.SpawnAdventureEnemy(
+                    name, pos, zoneCenter, level, isBoss, kind, mapIndex,
+                    move, 20f, allowRespawn: false, isChallengeEnemy: true);
+            }
+            Debug.LogWarning("[MapRuntime] NetCombatSession missing — challenge falls back to local.");
+        }
 
         Transform parent = _root != null ? _root : transform;
         var go = CreateEnemy(parent, name, pos, zoneCenter, level, isBoss, kind, mapIndex);
