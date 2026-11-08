@@ -4,7 +4,8 @@
     "references": [
         "RPG.Gameplay",
         "RPG.Core",
-        "Unity.Netcode.Runtime"
+        "Unity.Netcode.Runtime",
+        "Unity.Networking.Transport"
     ],
     "includePlatforms": [
         "Editor"
