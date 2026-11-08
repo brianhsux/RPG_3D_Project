@@ -1,0 +1,409 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "animagine-xl.safetensors"
+    },
+    "_meta": {
+      "title": "SDXL Checkpoint"
+    }
+  },
+  "2": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "clip": [
+        "1",
+        1
+      ],
+      "lora_name": "xianxia-guofeng.safetensors",
+      "strength_model": 0.0,
+      "strength_clip": 0.0
+    },
+    "_meta": {
+      "title": "LoRA 國風／仙俠（強度 0 停用）"
+    }
+  },
+  "3": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "2",
+        0
+      ],
+      "clip": [
+        "2",
+        1
+      ],
+      "lora_name": "game-icon-chibi.safetensors",
+      "strength_model": 0.0,
+      "strength_clip": 0.0
+    },
+    "_meta": {
+      "title": "LoRA Q版圖示（強度 0 停用）"
+    }
+  },
+  "4": {
+    "class_type": "CLIPSetLastLayer",
+    "inputs": {
+      "clip": [
+        "3",
+        1
+      ],
+      "stop_at_clip_layer": -2
+    },
+    "_meta": {
+      "title": "Clip Skip（Animagine 用 -2）"
+    }
+  },
+  "5": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "game asset, 2d game art, vector style, thick outlines, (single object:1.2), isolated, full body, a cute white mythical sparrow, glowing aura, xianxia"
+    },
+    "_meta": {
+      "title": "正向提示詞"
+    }
+  },
+  "6": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "3d, realistic, background elements, scenery, shadow, multiple views, text, watermark, photo"
+    },
+    "_meta": {
+      "title": "負向提示詞"
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncodeSDXL",
+    "inputs": {
+      "clip": [
+        "4",
+        0
+      ],
+      "width": 1024,
+      "height": 1024,
+      "crop_w": 0,
+      "crop_h": 0,
+      "target_width": 1024,
+      "target_height": 1024,
+      "text_g": [
+        "5",
+        0
+      ],
+      "text_l": [
+        "5",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SDXL 雙 CLIP 正向（G 與 L）"
+    }
+  },
+  "8": {
+    "class_type": "CLIPTextEncodeSDXL",
+    "inputs": {
+      "clip": [
+        "4",
+        0
+      ],
+      "width": 1024,
+      "height": 1024,
+      "crop_w": 0,
+      "crop_h": 0,
+      "target_width": 1024,
+      "target_height": 1024,
+      "text_g": [
+        "6",
+        0
+      ],
+      "text_l": [
+        "6",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SDXL 雙 CLIP 負向（G 與 L）"
+    }
+  },
+  "9": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "空白 Latent 1024"
+    }
+  },
+  "10": {
+    "class_type": "LayeredDiffusionApply",
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "config": "SDXL, Attention Injection",
+      "weight": 1.0
+    },
+    "_meta": {
+      "title": "Layer Diffuse SDXL Attention"
+    }
+  },
+  "11": {
+    "class_type": "ControlNetLoader",
+    "inputs": {
+      "control_net_name": "openpose-sdxl.safetensors"
+    },
+    "_meta": {
+      "title": "ControlNet OpenPose SDXL"
+    }
+  },
+  "12": {
+    "class_type": "ControlNetLoader",
+    "inputs": {
+      "control_net_name": "canny-sdxl.safetensors"
+    },
+    "_meta": {
+      "title": "ControlNet Canny SDXL"
+    }
+  },
+  "13": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1,
+      "color": 0
+    },
+    "_meta": {
+      "title": "空白圖（OpenPose 預設）"
+    }
+  },
+  "14": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1,
+      "color": 0
+    },
+    "_meta": {
+      "title": "空白圖（Canny 預設）"
+    }
+  },
+  "15": {
+    "class_type": "ControlNetApplyAdvanced",
+    "inputs": {
+      "positive": [
+        "7",
+        0
+      ],
+      "negative": [
+        "8",
+        0
+      ],
+      "control_net": [
+        "11",
+        0
+      ],
+      "image": [
+        "13",
+        0
+      ],
+      "strength": 0.0,
+      "start_percent": 0.0,
+      "end_percent": 1.0
+    },
+    "_meta": {
+      "title": "套用 OpenPose（強度預設 0）"
+    }
+  },
+  "16": {
+    "class_type": "ControlNetApplyAdvanced",
+    "inputs": {
+      "positive": [
+        "15",
+        0
+      ],
+      "negative": [
+        "15",
+        1
+      ],
+      "control_net": [
+        "12",
+        0
+      ],
+      "image": [
+        "14",
+        0
+      ],
+      "strength": 0.0,
+      "start_percent": 0.0,
+      "end_percent": 1.0
+    },
+    "_meta": {
+      "title": "套用 Canny（強度預設 0）"
+    }
+  },
+  "17": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "10",
+        0
+      ],
+      "seed": 0,
+      "steps": 28,
+      "cfg": 6.0,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "positive": [
+        "16",
+        0
+      ],
+      "negative": [
+        "16",
+        1
+      ],
+      "latent_image": [
+        "9",
+        0
+      ],
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "18": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "17",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    },
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "19": {
+    "class_type": "LayeredDiffusionDecodeRGBA",
+    "inputs": {
+      "samples": [
+        "17",
+        0
+      ],
+      "images": [
+        "18",
+        0
+      ],
+      "sd_version": "SDXL",
+      "sub_batch_size": 16
+    },
+    "_meta": {
+      "title": "Layer Diffuse 解出 RGBA"
+    }
+  },
+  "20": {
+    "class_type": "Image Remove Background (rembg)",
+    "inputs": {
+      "image": [
+        "18",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Rembg（開關關閉時不執行）"
+    }
+  },
+  "21": {
+    "class_type": "ComfySwitchNode",
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "19",
+        0
+      ],
+      "on_true": [
+        "20",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "輸出選擇（關＝透明，開＝Rembg）"
+    }
+  },
+  "22": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "21",
+        0
+      ],
+      "filename_prefix": "xianxia-sprite"
+    },
+    "_meta": {
+      "title": "儲存透明 PNG"
+    }
+  },
+  "23": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "pose_ref.png"
+    },
+    "_meta": {
+      "title": "姿勢參考圖（靜音，預設不跑）"
+    }
+  },
+  "24": {
+    "class_type": "OpenposePreprocessor",
+    "inputs": {
+      "image": [
+        "23",
+        0
+      ],
+      "detect_hand": "enable",
+      "detect_body": "enable",
+      "detect_face": "enable",
+      "resolution": 1024,
+      "scale_stick_for_xinsr_cn": "disable"
+    },
+    "_meta": {
+      "title": "OpenPose 預處理（靜音，預設不跑）"
+    }
+  },
+  "25": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sketch_ref.png"
+    },
+    "_meta": {
+      "title": "線稿參考圖（靜音，預設不跑）"
+    }
+  },
+  "26": {
+    "class_type": "CannyEdgePreprocessor",
+    "inputs": {
+      "image": [
+        "25",
+        0
+      ],
+      "low_threshold": 100,
+      "high_threshold": 200,
+      "resolution": 1024
+    },
+    "_meta": {
+      "title": "Canny 預處理（靜音，預設不跑）"
+    }
+  }
+}
