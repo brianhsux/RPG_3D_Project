@@ -79,6 +79,9 @@ public class NetBootstrap : MonoBehaviour
         var go = new GameObject("NetworkManager");
         DontDestroyOnLoad(go);
         _nm = go.AddComponent<NetworkManager>();
+        // Play Mode AddComponent does not run Reset(), so NetworkConfig stays null.
+        if (_nm.NetworkConfig == null)
+            _nm.NetworkConfig = new NetworkConfig();
         var transport = go.AddComponent<UnityTransport>();
         _nm.NetworkConfig.NetworkTransport = transport;
         ConfigureNetworkManager(_nm);
@@ -87,6 +90,8 @@ public class NetBootstrap : MonoBehaviour
     void ConfigureNetworkManager(NetworkManager nm)
     {
         if (nm == null) return;
+        if (nm.NetworkConfig == null)
+            nm.NetworkConfig = new NetworkConfig();
 
         // Phase 1: same scene for Host/Client — scene management only causes
         // Editor "add scene to build" prompts and is not needed yet.
@@ -145,6 +150,7 @@ public class NetBootstrap : MonoBehaviour
         cc.center = new Vector3(0f, 1f, 0f);
 
         go.AddComponent<NetworkObject>();
+        NetPlay.StampRuntimePrefab(go, NetPlay.RuntimePlayerHash);
         var nt = go.AddComponent<NetworkTransform>();
         nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner;
         go.AddComponent<NetworkPlayer>();
@@ -195,7 +201,23 @@ public class NetBootstrap : MonoBehaviour
             if (string.IsNullOrEmpty(LastMessage) || LastMessage.StartsWith("Connected") || LastMessage.StartsWith("Hosting"))
                 LastMessage = "Disconnected";
             RestoreSoloPlayer();
+            if (AdventureManager.Instance != null)
+                AdventureManager.Instance.RestorePersonalProgress();
         }
+    }
+
+    /// <summary>Commit the HUD text only when Host or Client is pressed.</summary>
+    public bool TryUseConnectionFields(string addressField, string portField)
+    {
+        connectAddress = ConnectionDraft.NormalizeAddress(addressField);
+        if (!ConnectionDraft.TryParsePort(portField, out int port))
+        {
+            LastMessage = "Port must be 1-65535";
+            return false;
+        }
+
+        connectPort = (ushort)port;
+        return true;
     }
 
     public bool StartHost()
@@ -262,6 +284,8 @@ public class NetBootstrap : MonoBehaviour
         }
         LastMessage = "Disconnected";
         RestoreSoloPlayer();
+        if (AdventureManager.Instance != null)
+            AdventureManager.Instance.RestorePersonalProgress();
     }
 
     NetCombatSession EnsureCombatSession()

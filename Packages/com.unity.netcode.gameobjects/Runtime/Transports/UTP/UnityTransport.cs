@@ -1126,7 +1126,11 @@ namespace Unity.Netcode.Transports.UTP
                             default,
                             m_RealTimeProvider.RealTimeSinceStartup);
 
-                        m_ServerClientId = clientId;
+                        // Only a client has a remote server connection. On a listening host this
+                        // id is the incoming peer; storing it makes later disconnects look like
+                        // the local host client (NGO client 0) left.
+                        if (!m_Driver.Listening)
+                            m_ServerClientId = clientId;
                         return true;
                     }
                 case TransportEvent.Disconnect:

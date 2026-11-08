@@ -548,22 +548,18 @@ public class PlayerInventory : MonoBehaviour
     {
         if (candidate == null) return false;
         if (current == null) return true;
-
-        float a = GearScore(candidate);
-        float b = GearScore(current);
-        if (a > b + 0.01f) return true;
-        if (a < b - 0.01f) return false;
-        if (candidate.rarity != current.rarity)
-            return candidate.rarity > current.rarity;
-        return candidate.itemLevel > current.itemLevel;
+        return GearRules.IsBetter(
+            GearScore(candidate), (int)candidate.rarity, candidate.itemLevel,
+            true,
+            GearScore(current), (int)current.rarity, current.itemLevel);
     }
 
     public static float GearScore(ItemInstance item)
     {
         if (item == null) return float.NegativeInfinity;
         if (item.slot == ItemSlot.Weapon)
-            return item.attack + item.attackSpeedBonus * 18f + item.attackRangeBonus * 8f;
-        return item.defense * 2.5f + item.maxHpBonus * 0.12f;
+            return GearRules.WeaponScore(item.attack, item.attackSpeedBonus, item.attackRangeBonus);
+        return GearRules.ArmorScore(item.defense, item.maxHpBonus);
     }
 
     public string CompareLabel(ItemInstance item)
@@ -1251,17 +1247,7 @@ public class PlayerInventory : MonoBehaviour
         return total;
     }
 
-    static int CountRecursiveCrafts(int count)
-    {
-        int total = 0;
-        while (count >= 3)
-        {
-            int batches = count / 3;
-            total += batches;
-            count = batches + (count % 3); // products + leftovers
-        }
-        return total;
-    }
+    static int CountRecursiveCrafts(int count) => GearRules.CountRecursiveCrafts(count);
 
     static float MathMin(float a, float b) => a < b ? a : b;
 

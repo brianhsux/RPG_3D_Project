@@ -1122,13 +1122,7 @@ public class MapRuntimeBuilder : MonoBehaviour
         root.transform.SetParent(parent, false);
         root.transform.position = pos;
 
-        float scale = isBoss ? 1.75f : 1f;
-        if (kind == EnemyKind.WorldBoss) scale = 1.9f;
-        else if (kind == EnemyKind.Golem || kind == EnemyKind.Treant || kind == EnemyKind.Demon || kind == EnemyKind.Yeti)
-            scale = isBoss ? 1.6f : 1.15f;
-        else if (kind == EnemyKind.Imp || kind == EnemyKind.Bat || kind == EnemyKind.Beetle ||
-                 kind == EnemyKind.Mosquito || kind == EnemyKind.StormSprite)
-            scale = 0.9f;
+        float scale = NetworkEnemy.ScaleFor(kind, isBoss);
 
         EnemyVisuals.Build(root.transform, kind, scale);
 

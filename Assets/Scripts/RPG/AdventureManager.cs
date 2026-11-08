@@ -20,6 +20,11 @@ public class AdventureManager : MonoBehaviour
 
     readonly HashSet<string> _clearedBossKeys = new HashSet<string>();
 
+    /// <summary>Save payload. Session flags can follow the host without erasing solo unlocks.</summary>
+    readonly HashSet<string> _personalBossKeys = new HashSet<string>();
+    int _personalHighest = 1;
+    bool _personalHydrated;
+
     /// <summary>True while applying a Host snapshot — skip re-broadcast.</summary>
     bool _networkSyncing;
 
@@ -80,6 +85,7 @@ public class AdventureManager : MonoBehaviour
         }
 
         RefreshBossFlags();
+        HydratePersonalFromSession();
     }
 
     public void WriteToSave(AccountSaveData data)
@@ -87,12 +93,70 @@ public class AdventureManager : MonoBehaviour
         if (data == null) return;
         data.currentWorld = currentWorld;
         data.currentMap = currentMap;
-        data.highestWorldUnlocked = highestWorldUnlocked;
         data.killCount = killCount;
 
-        var keys = new string[_clearedBossKeys.Count];
-        _clearedBossKeys.CopyTo(keys);
-        data.clearedBossKeys = keys;
+        if (_personalHydrated)
+        {
+            data.highestWorldUnlocked = _personalHighest;
+            var savedKeys = new string[_personalBossKeys.Count];
+            _personalBossKeys.CopyTo(savedKeys);
+            data.clearedBossKeys = savedKeys;
+        }
+        else
+        {
+            data.highestWorldUnlocked = highestWorldUnlocked;
+            var keys = new string[_clearedBossKeys.Count];
+            _clearedBossKeys.CopyTo(keys);
+            data.clearedBossKeys = keys;
+        }
+    }
+
+    void HydratePersonalFromSession()
+    {
+        _personalHighest = highestWorldUnlocked;
+        _personalBossKeys.Clear();
+        foreach (var key in _clearedBossKeys)
+            _personalBossKeys.Add(key);
+        _personalHydrated = true;
+    }
+
+    /// <summary>Union the current session into the save payload. Does not change the session view.</summary>
+    public void CapturePersonalProgress()
+    {
+        if (!_personalHydrated)
+            HydratePersonalFromSession();
+
+        var personal = new AdventureProgress.Snapshot
+        {
+            HighestWorldUnlocked = _personalHighest,
+            ClearedBossKeys = CopyKeys(_personalBossKeys)
+        };
+        var merged = AdventureProgress.Merge(personal, highestWorldUnlocked, ExportClearedBossKeysCsv());
+        _personalHighest = merged.HighestWorldUnlocked;
+        _personalBossKeys.Clear();
+        if (merged.ClearedBossKeys != null)
+        {
+            for (int i = 0; i < merged.ClearedBossKeys.Length; i++)
+                _personalBossKeys.Add(merged.ClearedBossKeys[i]);
+        }
+    }
+
+    /// <summary>After leaving a session, show the saved unlocks again. In-session UI still follows the host.</summary>
+    public void RestorePersonalProgress()
+    {
+        if (!_personalHydrated) return;
+        highestWorldUnlocked = _personalHighest;
+        _clearedBossKeys.Clear();
+        foreach (var key in _personalBossKeys)
+            _clearedBossKeys.Add(key);
+        RefreshBossFlags();
+    }
+
+    static string[] CopyKeys(HashSet<string> keys)
+    {
+        var copy = new string[keys.Count];
+        keys.CopyTo(copy);
+        return copy;
     }
 
     void DisableLegacyWorld()
@@ -239,6 +303,7 @@ public class AdventureManager : MonoBehaviour
         if (!fromNetwork)
             PlacePlayerInTile(startMap);
 
+        CapturePersonalProgress();
         if (AccountManager.Instance != null)
             AccountManager.Instance.SaveActive(silent: true);
     }
@@ -269,6 +334,8 @@ public class AdventureManager : MonoBehaviour
                 if (MapRuntimeBuilder.Instance != null)
                     MapRuntimeBuilder.Instance.BuildCurrentWorld();
             }
+
+            CapturePersonalProgress();
         }
         finally
         {
@@ -359,17 +426,7 @@ public class AdventureManager : MonoBehaviour
         PlacePlayerAt(player, pos);
     }
 
-    static GameObject FindSoloPlayer()
-    {
-        var players = GameObject.FindGameObjectsWithTag("Player");
-        for (int i = 0; i < players.Length; i++)
-        {
-            if (players[i] == null) continue;
-            if (players[i].GetComponent<NetworkPlayer>() != null) continue;
-            return players[i];
-        }
-        return players.Length > 0 ? players[0] : null;
-    }
+    static GameObject FindSoloPlayer() => PlayerLookup.FindSoloHero();
 
     static void PlacePlayerAt(GameObject player, Vector3 pos)
     {
@@ -385,40 +442,52 @@ public class AdventureManager : MonoBehaviour
     public void NotifyEnemyDied(CharacterStats stats)
     {
         if (stats == null || stats.isPlayer) return;
+        int map = stats.mapIndex > 0 ? stats.mapIndex : currentMap;
+        RegisterKill(stats.isBoss, map, stats.isChallengeEnemy, stats);
+    }
+
+    /// <summary>Network kill notice. Challenge list removal already happened on the host.</summary>
+    public void NotifyNetworkKill(bool isBoss, int mapIndex, bool isChallenge)
+    {
+        int map = mapIndex > 0 ? mapIndex : currentMap;
+        RegisterKill(isBoss, map, isChallenge, null);
+    }
+
+    void RegisterKill(bool isBoss, int map, bool isChallenge, CharacterStats challengeStats)
+    {
         killCount++;
 
-        if (stats.isChallengeEnemy)
+        if (isChallenge)
         {
-            if (ChallengeAltar.Active != null)
-                ChallengeAltar.Active.NotifyEnemyKilled(stats);
+            if (challengeStats != null && ChallengeAltar.Active != null)
+                ChallengeAltar.Active.NotifyEnemyKilled(challengeStats);
             return;
         }
 
-        if (stats.isBoss)
+        if (!isBoss) return;
+
+        _clearedBossKeys.Add(BossKey(currentWorld, map));
+        if (map == currentMap)
+            mapBossDefeated = true;
+
+        if (map == 4 && currentWorld < ProgressionFormulas.WorldCount)
         {
-            int map = stats.mapIndex > 0 ? stats.mapIndex : currentMap;
-            _clearedBossKeys.Add(BossKey(currentWorld, map));
-            if (map == currentMap)
-                mapBossDefeated = true;
-
-            if (map == 4 && currentWorld < ProgressionFormulas.WorldCount)
-            {
-                worldPortalReady = true;
-                if (MapRuntimeBuilder.Instance != null)
-                    MapRuntimeBuilder.Instance.SpawnWorldPortal();
-            }
-
-            if (PlayerInventory.Instance != null)
-            {
-                string msg = map == 4
-                    ? "World Boss defeated! Next-world portal opened"
-                    : $"Map {map} Boss defeated!";
-                PlayerInventory.Instance.ShowLoot(msg);
-            }
-
-            if (AccountManager.Instance != null)
-                AccountManager.Instance.SaveActive(silent: true);
+            worldPortalReady = true;
+            if (MapRuntimeBuilder.Instance != null)
+                MapRuntimeBuilder.Instance.SpawnWorldPortal();
         }
+
+        if (PlayerInventory.Instance != null)
+        {
+            string msg = map == 4
+                ? "World Boss defeated! Next-world portal opened"
+                : $"Map {map} Boss defeated!";
+            PlayerInventory.Instance.ShowLoot(msg);
+        }
+
+        CapturePersonalProgress();
+        if (AccountManager.Instance != null)
+            AccountManager.Instance.SaveActive(silent: true);
     }
 
     public void EnterNextWorld()

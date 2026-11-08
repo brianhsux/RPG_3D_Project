@@ -11,7 +11,7 @@ public class CameraFollow : MonoBehaviour
     {
         if (target == null)
         {
-            var player = GameObject.FindGameObjectWithTag("Player");
+            var player = PlayerLookup.FindSoloHero();
             if (player != null) target = player.transform;
         }
     }

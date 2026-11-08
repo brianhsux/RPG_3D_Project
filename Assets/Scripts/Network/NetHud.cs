@@ -106,17 +106,15 @@ public class NetHud : MonoBehaviour
             _portField = GUI.TextField(new Rect(x + 70f, y, tw - 70f, 28f), _portField ?? "");
             y += 36f;
 
-            ApplyConnectionFields(boot);
-
             if (RPGUI.ButtonSm(new Rect(x, y, btnW, RPGUI.ButtonSmH), "Host", true))
             {
-                ApplyConnectionFields(boot);
-                boot.StartHost();
+                if (boot.TryUseConnectionFields(_addressField, _portField))
+                    boot.StartHost();
             }
             if (RPGUI.ButtonSm(new Rect(x + btnW + 8f, y, btnW, RPGUI.ButtonSmH), "Client"))
             {
-                ApplyConnectionFields(boot);
-                boot.StartClient();
+                if (boot.TryUseConnectionFields(_addressField, _portField))
+                    boot.StartClient();
             }
             y += RPGUI.ButtonSmH + 8f;
             RPGUI.DrawText(new Rect(x, y, tw, RPGUI.FieldTagH),
@@ -144,18 +142,6 @@ public class NetHud : MonoBehaviour
             y += RPGUI.FieldTagH + 8f;
             RPGUI.DrawText(new Rect(x, y, tw, RPGUI.HintH), boot.LastMessage, RPGUI.Hint);
         }
-    }
-
-    void ApplyConnectionFields(NetBootstrap boot)
-    {
-        boot.connectAddress = string.IsNullOrWhiteSpace(_addressField)
-            ? NetBootstrap.DefaultAddress
-            : _addressField.Trim();
-
-        if (!ushort.TryParse(_portField, out ushort port) || port == 0)
-            port = NetBootstrap.DefaultPort;
-        boot.connectPort = port;
-        _portField = port.ToString();
     }
 
     static string AdventureLocationLabel()

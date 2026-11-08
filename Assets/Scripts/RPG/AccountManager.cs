@@ -242,7 +242,7 @@ public class AccountManager : MonoBehaviour
         if (pets != null)
             pets.WriteToSave(data);
 
-        var player = GameObject.FindGameObjectWithTag("Player");
+        var player = PlayerLookup.FindSoloHero();
         if (player != null)
         {
             var stats = player.GetComponent<CharacterStats>();
@@ -271,7 +271,7 @@ public class AccountManager : MonoBehaviour
         if (adv != null)
             adv.ApplySave(data);
 
-        var player = GameObject.FindGameObjectWithTag("Player");
+        var player = PlayerLookup.FindSoloHero();
         if (player != null)
         {
             var stats = player.GetComponent<CharacterStats>();

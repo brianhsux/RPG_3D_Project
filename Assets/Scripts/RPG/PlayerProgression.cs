@@ -39,16 +39,11 @@ public class PlayerProgression : MonoBehaviour
     {
         if (amount <= 0) return;
 
-        xp += amount;
-        bool leveled = false;
-        int safety = 0;
-        while (xp >= xpToNext && safety++ < 1000)
-        {
-            xp -= xpToNext;
-            level++;
-            xpToNext = ProgressionFormulas.XpToNextLevel(level);
-            leveled = true;
-        }
+        var gained = ProgressionRules.ApplyXp(level, xp, amount);
+        level = gained.Level;
+        xp = gained.Xp;
+        xpToNext = ProgressionRules.XpToNextLevel(level);
+        bool leveled = gained.LevelsGained > 0;
 
         if (PlayerInventory.Instance != null)
         {

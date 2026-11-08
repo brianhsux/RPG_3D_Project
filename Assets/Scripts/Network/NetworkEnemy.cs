@@ -214,25 +214,32 @@ public class NetworkEnemy : NetworkBehaviour
         {
             _nextAttackTime = Time.time + _attackCooldown;
             var combat = target.GetComponent<NetworkPlayerCombat>();
-            if (combat != null)
-                combat.ApplyDamageServer(_attackDamage);
+            if (combat != null && combat.CurrentHp.Value > 0f)
+            {
+                float dealt = combat.MitigateIncomingServer(_attackDamage);
+                combat.ApplyDamageServer(dealt);
+                if (_despawning) return;
+                float reflect = combat.ReflectFromLastHit(dealt);
+                if (reflect > 0f)
+                    ApplyDamageServer(reflect, combat.OwnerClientId);
+            }
         }
     }
 
-    public void ApplyDamageServer(float amount, ulong attackerClientId)
+    public float ApplyDamageServer(float amount, ulong attackerClientId)
     {
-        if (!IsServer || _despawning) return;
-        if (CurrentHp.Value <= 0f) return;
-
-        float dealt = Mathf.Max(0f, amount);
-        if (dealt < 0.5f) return;
+        if (!IsServer || _despawning) return 0f;
+        if (CurrentHp.Value <= 0f) return 0f;
+        if (amount <= 0f) return 0f;
 
         _lastAttackerClientId = attackerClientId;
-        CurrentHp.Value = Mathf.Max(0f, CurrentHp.Value - dealt);
-        ShowDamageClientRpc(dealt, IsBoss.Value);
+        CurrentHp.Value = CombatMath.SubtractHp(CurrentHp.Value, amount);
+        if (amount >= 0.5f)
+            ShowDamageClientRpc(amount, IsBoss.Value);
 
         if (CurrentHp.Value <= 0f)
             BeginDespawn();
+        return amount;
     }
 
     [ClientRpc]
@@ -358,18 +365,10 @@ public class NetworkEnemy : NetworkBehaviour
     void OnEnemyKilledClientRpc(bool isBoss, int mapIndex, int contentLevel, int kindId, bool isChallenge)
     {
         if (AdventureManager.Instance == null) return;
-
-        var tmp = new GameObject("NetKillNotify");
-        var stats = tmp.AddComponent<CharacterStats>();
-        stats.isPlayer = false;
-        stats.isBoss = isBoss;
-        stats.mapIndex = mapIndex;
-        stats.contentLevel = contentLevel;
-        stats.enemyKind = (EnemyKind)kindId;
-        stats.isChallengeEnemy = isChallenge;
-        stats.isDead = true;
-        AdventureManager.Instance.NotifyEnemyDied(stats);
-        Destroy(tmp);
+        // contentLevel / kindId stay on the RPC so the message shape does not change.
+        _ = contentLevel;
+        _ = kindId;
+        AdventureManager.Instance.NotifyNetworkKill(isBoss, mapIndex, isChallenge);
     }
 
     NetworkPlayer FindNearestLivingPlayer()

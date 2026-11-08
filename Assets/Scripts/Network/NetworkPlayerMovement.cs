@@ -52,10 +52,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
         var combat = GetComponent<NetworkPlayerCombat>();
         if (combat != null && !combat.IsAlive) return;
 
-        // Don't steal input while character panel is open (same as solo).
-        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel)
-            return;
-
+        // Inventory stays open without freezing the body — same as the solo controller.
         Vector2 move = ReadMoveInput();
         Vector3 input = new Vector3(move.x, 0f, move.y);
         if (input.sqrMagnitude > 1f) input.Normalize();
