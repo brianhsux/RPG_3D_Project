@@ -174,7 +174,7 @@ public class SoloCombatPlayModeTests
     static bool ReplayTrashDrop(int seed)
     {
         Random.InitState(seed);
-        Random.value;
+        _ = Random.value;
         Random.Range(-42f, 42f);
         Random.Range(-6f, 10f);
         return Random.value < 0.55f;
