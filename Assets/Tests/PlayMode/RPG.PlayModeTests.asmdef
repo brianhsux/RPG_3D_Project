@@ -4,9 +4,7 @@
     "references": [
         "RPG.Gameplay",
         "RPG.Core",
-        "Unity.Netcode.Runtime",
-        "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "Unity.Netcode.Runtime"
     ],
     "includePlatforms": [
         "Editor"
