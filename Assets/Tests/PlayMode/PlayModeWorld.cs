@@ -6,14 +6,13 @@ using System.Reflection;
 using NUnit.Framework;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Loads RPGBattle in the editor play mode loop and keeps probe accounts out of the
-/// real save folder. Waits use realtime so batchmode (-nographics) is not stuck on
-/// scaled time or end-of-frame rendering.
+/// Loads RPGBattle during PlayMode and keeps probe accounts out of the real save folder.
+/// Waits use realtime so batchmode (-nographics) is not stuck on scaled time or end-of-frame rendering.
+/// The scene is not in Build Settings, so the editor supplies LoadSceneAsyncInPlayMode.
 /// </summary>
 public static class PlayModeWorld
 {
@@ -50,9 +49,7 @@ public static class PlayModeWorld
         SuppressSaves();
         yield return DestroySessionObjects();
 
-        var load = EditorSceneManager.LoadSceneAsyncInPlayMode(
-            ScenePath,
-            new LoadSceneParameters(LoadSceneMode.Single));
+        var load = PlayModeSceneLoader.Load(ScenePath, new LoadSceneParameters(LoadSceneMode.Single));
         Assert.IsNotNull(load, "Could not start loading " + ScenePath);
         while (!load.isDone)
             yield return null;
