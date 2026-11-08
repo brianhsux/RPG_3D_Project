@@ -235,6 +235,7 @@ public class NetCombatSession : MonoBehaviour
         go.SetActive(false);
 
         go.AddComponent<NetworkObject>();
+        NetPlay.StampRuntimePrefab(go, NetPlay.RuntimeEnemyHash);
         var nt = go.AddComponent<NetworkTransform>();
         nt.AuthorityMode = NetworkTransform.AuthorityModes.Server;
         go.AddComponent<NetworkEnemy>();

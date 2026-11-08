@@ -94,6 +94,7 @@ public class NetAdventureState : NetworkBehaviour
         Object.DontDestroyOnLoad(go);
         go.SetActive(false);
         go.AddComponent<NetworkObject>();
+        NetPlay.StampRuntimePrefab(go, NetPlay.RuntimeAdventureHash);
         go.AddComponent<NetAdventureState>();
         _runtimeTemplate = go;
         Debug.Log("[NetAdventure] Built runtime NetAdventureState template.");

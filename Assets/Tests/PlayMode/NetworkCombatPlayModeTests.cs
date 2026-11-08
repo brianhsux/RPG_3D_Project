@@ -10,6 +10,8 @@ using UnityEngine.TestTools;
 /// One editor process, two NetworkManagers: the scene Host and a second Client on localhost.
 /// NGO only promotes the first manager to the singleton, which matches how this project looks
 /// up NetPlay. The client still owns its player object and receives replicated HP.
+/// The client manager is built the way NGO's in-process tests do: inactive until NetworkConfig
+/// exists. Play Mode does not call Reset(), so AddComponent leaves that field null.
 /// </summary>
 public class NetworkCombatPlayModeTests
 {
@@ -35,6 +37,8 @@ public class NetworkCombatPlayModeTests
     {
         var hero = PlayModeWorld.RequireSoloHero().GetComponent<CharacterStats>();
         var bootstrap = NetBootstrap.Instance;
+        if (NetHud.Instance != null)
+            NetHud.Instance.showPanel = false;
         var host = NetworkManager.Singleton;
         Assert.IsNotNull(host, "Scene NetworkManager was not registered.");
         Assert.IsFalse(host.IsListening, "Test must start from an offline scene.");
@@ -69,6 +73,9 @@ public class NetworkCombatPlayModeTests
             hostMotion.enabled = false;
 
         yield return new WaitForSecondsRealtime(0.35f);
+
+        Assert.IsTrue(host != null && host.IsHost && host.IsListening, "Host dropped local client 0 before the peer was created. " + bootstrap.LastMessage);
+        Assert.IsNotNull(HostCombat(), "Host player despawned before the peer was created.");
 
         _client = CreateClient(host, port);
         bool clientStarted = _client.StartClient();
@@ -223,22 +230,28 @@ public class NetworkCombatPlayModeTests
 
     static NetworkManager CreateClient(NetworkManager host, ushort port)
     {
+        // Stay inactive until NetworkConfig is assigned. Awake initializes prefabs,
+        // and enabling early would also run while the host is already the singleton.
         var clientObject = new GameObject("PlayModeClient");
+        clientObject.SetActive(false);
         var client = clientObject.AddComponent<NetworkManager>();
         var transport = clientObject.AddComponent<UnityTransport>();
         PlayModeWorld.RelaxTransport(transport);
         transport.SetConnectionData("127.0.0.1", port, "127.0.0.1");
 
-        client.NetworkConfig.NetworkTransport = transport;
-        client.NetworkConfig.EnableSceneManagement = false;
-        client.NetworkConfig.ForceSamePrefabs = false;
-        client.NetworkConfig.ConnectionApproval = false;
-        client.NetworkConfig.TickRate = host.NetworkConfig.TickRate;
-        client.NetworkConfig.ProtocolVersion = host.NetworkConfig.ProtocolVersion;
-        client.NetworkConfig.PlayerPrefab = host.NetworkConfig.PlayerPrefab;
-        client.NetworkConfig.NetworkTopology = host.NetworkConfig.NetworkTopology;
-        client.NetworkConfig.AutoSpawnPlayerPrefabClientSide = host.NetworkConfig.AutoSpawnPlayerPrefabClientSide;
-        client.NetworkConfig.SpawnTimeout = host.NetworkConfig.SpawnTimeout;
+        client.NetworkConfig = new NetworkConfig
+        {
+            NetworkTransport = transport,
+            EnableSceneManagement = false,
+            ForceSamePrefabs = false,
+            ConnectionApproval = false,
+            TickRate = host.NetworkConfig.TickRate,
+            ProtocolVersion = host.NetworkConfig.ProtocolVersion,
+            PlayerPrefab = host.NetworkConfig.PlayerPrefab,
+            NetworkTopology = host.NetworkConfig.NetworkTopology,
+            AutoSpawnPlayerPrefabClientSide = host.NetworkConfig.AutoSpawnPlayerPrefabClientSide,
+            SpawnTimeout = host.NetworkConfig.SpawnTimeout
+        };
         client.RunInBackground = true;
 
         client.NetworkConfig.Prefabs.NetworkPrefabsLists.Clear();
@@ -260,6 +273,7 @@ public class NetworkCombatPlayModeTests
             client.AddNetworkPrefab(entry.Prefab);
         }
 
+        clientObject.SetActive(true);
         Assert.AreNotSame(host, client);
         Assert.AreSame(host, NetworkManager.Singleton, "Creating the client replaced the host singleton.");
         return client;

@@ -79,6 +79,9 @@ public class NetBootstrap : MonoBehaviour
         var go = new GameObject("NetworkManager");
         DontDestroyOnLoad(go);
         _nm = go.AddComponent<NetworkManager>();
+        // Play Mode AddComponent does not run Reset(), so NetworkConfig stays null.
+        if (_nm.NetworkConfig == null)
+            _nm.NetworkConfig = new NetworkConfig();
         var transport = go.AddComponent<UnityTransport>();
         _nm.NetworkConfig.NetworkTransport = transport;
         ConfigureNetworkManager(_nm);
@@ -87,6 +90,8 @@ public class NetBootstrap : MonoBehaviour
     void ConfigureNetworkManager(NetworkManager nm)
     {
         if (nm == null) return;
+        if (nm.NetworkConfig == null)
+            nm.NetworkConfig = new NetworkConfig();
 
         // Phase 1: same scene for Host/Client — scene management only causes
         // Editor "add scene to build" prompts and is not needed yet.
@@ -145,6 +150,7 @@ public class NetBootstrap : MonoBehaviour
         cc.center = new Vector3(0f, 1f, 0f);
 
         go.AddComponent<NetworkObject>();
+        NetPlay.StampRuntimePrefab(go, NetPlay.RuntimePlayerHash);
         var nt = go.AddComponent<NetworkTransform>();
         nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner;
         go.AddComponent<NetworkPlayer>();

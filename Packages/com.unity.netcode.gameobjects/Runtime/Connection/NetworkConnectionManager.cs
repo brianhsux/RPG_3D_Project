@@ -352,14 +352,17 @@ namespace Unity.Netcode
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal (ulong, bool) TransportIdToClientId(ulong transportId)
         {
-            if (transportId == GetServerTransportId())
-            {
-                return (NetworkManager.ServerClientId, true);
-            }
-
             if (TransportIdToClientIdMap.TryGetValue(transportId, out var clientId))
             {
                 return (clientId, true);
+            }
+
+            // Pure clients alias the remote server transport id to NGO client 0.
+            // A host/server has no transport connection for its own player. Id 0 means
+            // "no connection" there; treating it as the host despawns the local avatar.
+            if (!NetworkManager.IsServer && transportId == GetServerTransportId())
+            {
+                return (NetworkManager.ServerClientId, true);
             }
 
             return (default, false);
