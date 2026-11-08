@@ -10,7 +10,7 @@ public class ChallengeAltar : MonoBehaviour
 {
     public static ChallengeAltar Active { get; private set; }
 
-    public const int TotalWaves = 10;
+    public const int TotalWaves = ChallengeRules.TotalWaves;
     public const float ClearBuffer = 50f;
     public const float CooldownSeconds = 90f;
     public const float InteractRange = 3.2f;
@@ -86,55 +86,15 @@ public class ChallengeAltar : MonoBehaviour
         }
     }
 
-    static float WaveIntervalFor(Difficulty d)
-    {
-        switch (d)
-        {
-            case Difficulty.Hard: return 6.5f;
-            case Difficulty.Extreme: return 4.5f;
-            default: return 9f;
-        }
-    }
+    static float WaveIntervalFor(Difficulty d) => ChallengeRules.WaveIntervalSeconds((int)d);
 
-    static float StatMultFor(Difficulty d)
-    {
-        switch (d)
-        {
-            case Difficulty.Hard: return 1.25f;
-            case Difficulty.Extreme: return 1.55f;
-            default: return 1f;
-        }
-    }
+    static float StatMultFor(Difficulty d) => ChallengeRules.StatMultiplier((int)d);
 
-    static float EliteChanceFor(Difficulty d)
-    {
-        switch (d)
-        {
-            case Difficulty.Hard: return 0.28f;
-            case Difficulty.Extreme: return 0.48f;
-            default: return 0.08f;
-        }
-    }
+    static float EliteChanceFor(Difficulty d) => ChallengeRules.EliteChance((int)d);
 
-    static int ExtraLevelFor(Difficulty d)
-    {
-        switch (d)
-        {
-            case Difficulty.Hard: return 1;
-            case Difficulty.Extreme: return 3;
-            default: return 0;
-        }
-    }
+    static int ExtraLevelFor(Difficulty d) => ChallengeRules.ExtraLevel((int)d);
 
-    static float RewardXpMult(Difficulty d)
-    {
-        switch (d)
-        {
-            case Difficulty.Hard: return 1.5f;
-            case Difficulty.Extreme: return 2.2f;
-            default: return 1f;
-        }
-    }
+    static float RewardXpMult(Difficulty d) => ChallengeRules.RewardXpMultiplier((int)d);
 
     void OnDestroy()
     {
@@ -343,12 +303,10 @@ public class ChallengeAltar : MonoBehaviour
         _wave = wave;
 
         int content = ProgressionFormulas.ContentLevel(world, mapIndex) + ExtraLevelFor(_difficulty);
-        GetWaveSpawn(wave, out int count, out int levelBonus, out bool miniBoss);
-
-        if (_difficulty == Difficulty.Hard && !miniBoss && wave >= 4)
-            count += 1;
-        if (_difficulty == Difficulty.Extreme && !miniBoss && wave >= 3)
-            count += 2;
+        var spawn = ChallengeRules.GetWave(wave);
+        int count = ChallengeRules.EnemyCount(wave, (int)_difficulty);
+        int levelBonus = spawn.LevelBonus;
+        bool miniBoss = spawn.MiniBoss;
 
         EnemyKind kind = EnemyVisuals.KindForZone(world, mapIndex);
         var builder = MapRuntimeBuilder.Instance;
@@ -382,8 +340,7 @@ public class ChallengeAltar : MonoBehaviour
             {
                 if (miniBoss)
                 {
-                    float champHp = _difficulty == Difficulty.Extreme ? 2.4f : (_difficulty == Difficulty.Hard ? 2.0f : 1.8f);
-                    float champAtk = _difficulty == Difficulty.Extreme ? 1.5f : (_difficulty == Difficulty.Hard ? 1.35f : 1.25f);
+                    ChallengeRules.ChampionFactors((int)_difficulty, out float champHp, out float champAtk);
                     net.ApplyCombatMultipliersServer(champHp * statMult, champAtk * statMult, 1.15f);
                 }
                 else if (elite)
@@ -402,8 +359,7 @@ public class ChallengeAltar : MonoBehaviour
 
             if (miniBoss)
             {
-                float champHp = _difficulty == Difficulty.Extreme ? 2.4f : (_difficulty == Difficulty.Hard ? 2.0f : 1.8f);
-                float champAtk = _difficulty == Difficulty.Extreme ? 1.5f : (_difficulty == Difficulty.Hard ? 1.35f : 1.25f);
+                ChallengeRules.ChampionFactors((int)_difficulty, out float champHp, out float champAtk);
                 stats.displayName = "Challenge Champion Lv" + (content + levelBonus);
                 stats.maxHealth *= champHp * statMult;
                 stats.currentHealth = stats.maxHealth;
@@ -431,29 +387,6 @@ public class ChallengeAltar : MonoBehaviour
 
         if (PlayerInventory.Instance != null)
             PlayerInventory.Instance.ShowLoot($"Wave {_wave}/{TotalWaves}!");
-    }
-
-    static void GetWaveSpawn(int wave, out int count, out int levelBonus, out bool miniBoss)
-    {
-        miniBoss = false;
-        levelBonus = 0;
-        switch (wave)
-        {
-            case 1: count = 2; break;
-            case 2: count = 3; break;
-            case 3: count = 3; levelBonus = 1; break;
-            case 4: count = 4; levelBonus = 1; break;
-            case 5: count = 4; levelBonus = 2; break;
-            case 6: count = 5; levelBonus = 2; break;
-            case 7: count = 5; levelBonus = 3; break;
-            case 8: count = 6; levelBonus = 3; break;
-            case 9: count = 4; levelBonus = 4; break;
-            default:
-                count = 1;
-                levelBonus = 5;
-                miniBoss = true;
-                break;
-        }
     }
 
     public void NotifyEnemyKilled(CharacterStats stats)

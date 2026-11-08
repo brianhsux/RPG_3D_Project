@@ -67,7 +67,11 @@ public class PlayerPetController : MonoBehaviour
 
         float heal = _stats.maxHealth * buffs.regenPercentPerTick;
         if (heal > 0.05f)
+        {
             _stats.Heal(heal);
+            if (NetPlay.IsNetworking)
+                NetworkPlayerCombat.RequestOwnerHeal(heal);
+        }
     }
 
     public void ResetToStarter()

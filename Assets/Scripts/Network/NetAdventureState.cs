@@ -141,8 +141,13 @@ public class NetAdventureState : NetworkBehaviour
             return;
         }
 
-        bool unlocked = adv.HasVisitedWorld(world)
-                        || (world == adv.currentWorld + 1 && !adv.IsInVillage && adv.worldPortalReady);
+        bool unlocked = AdventureProgress.CanEnterWorld(
+            world,
+            adv.currentWorld,
+            adv.IsInVillage,
+            adv.worldPortalReady,
+            adv.highestWorldUnlocked,
+            ProgressionFormulas.WorldCount);
         if (!unlocked)
         {
             string msg = world == adv.currentWorld + 1
@@ -217,6 +222,7 @@ public class NetAdventureState : NetworkBehaviour
                 AdventureManager.Instance.highestWorldUnlocked =
                     Mathf.Max(AdventureManager.Instance.highestWorldUnlocked, highest);
                 AdventureManager.Instance.RefreshBossFlagsPublic();
+                AdventureManager.Instance.CapturePersonalProgress();
             }
         }
 

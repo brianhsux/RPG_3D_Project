@@ -148,13 +148,15 @@ public class NetCombatSession : MonoBehaviour
         if (!NetPlay.IsServer) return;
         if (!spec.allowRespawn) return;
         float delay = delaySeconds > 0f ? delaySeconds : enemyRespawnDelay;
-        var job = StartCoroutine(RespawnAfterDelay(spec, delay));
+        Coroutine job = null;
+        job = StartCoroutine(RespawnAfterDelay(spec, delay, () => { _respawnJobs.Remove(job); }));
         _respawnJobs.Add(job);
     }
 
-    IEnumerator RespawnAfterDelay(EnemySpawnSpec spec, float delay)
+    IEnumerator RespawnAfterDelay(EnemySpawnSpec spec, float delay, System.Action onDone)
     {
         yield return new WaitForSeconds(Mathf.Max(0.5f, delay));
+        onDone?.Invoke();
         if (!NetPlay.IsServer) yield break;
         SpawnAdventureEnemy(
             spec.name, spec.pos, spec.zoneCenter, spec.level, spec.isBoss,

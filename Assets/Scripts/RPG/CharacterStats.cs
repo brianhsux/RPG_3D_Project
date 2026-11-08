@@ -103,16 +103,13 @@ public class CharacterStats : MonoBehaviour
     {
         if (target == null || target.isDead || isDead) return 0f;
 
-        float dmg = attackDamage;
-        bool crit = Random.value < Mathf.Clamp01(critChance);
-        if (crit)
-            dmg *= 1f + Mathf.Max(0.35f, critDamageBonus);
-
-        float total = dmg + fireBonus + iceBonus + poisonBonus;
+        float total = CombatMath.OutgoingDamage(
+            attackDamage, critChance, critDamageBonus, Random.value, fireBonus, iceBonus, poisonBonus);
         float dealt = target.TakeDamage(total, this);
 
-        if (lifesteal > 0f && dealt > 0f)
-            currentHealth = Mathf.Min(maxHealth, currentHealth + dealt * lifesteal);
+        float heal = CombatMath.LifestealHeal(dealt, lifesteal);
+        if (heal > 0f)
+            currentHealth = Mathf.Min(maxHealth, currentHealth + heal);
 
         return dealt;
     }
@@ -131,25 +128,19 @@ public class CharacterStats : MonoBehaviour
     {
         if (isDead) return 0f;
 
-        float incoming = Mathf.Max(0f, amount);
-
-        if (isPlayer)
-        {
-            if (blockChance > 0f && Random.value < blockChance)
-                incoming *= 0.2f; // Block absorbs most damage
-
-            incoming *= 1f - Mathf.Clamp01(damageReduction);
-            incoming = ProgressionFormulas.MitigateDamage(incoming, defense);
-        }
+        bool blocked = isPlayer && blockChance > 0f && Random.value < blockChance;
+        float incoming = isPlayer
+            ? CombatMath.MitigatePlayerIncoming(amount, defense, damageReduction, blocked)
+            : Mathf.Max(0f, amount);
 
         float finalDmg = Mathf.Max(0f, incoming);
         currentHealth = Mathf.Max(0f, currentHealth - finalDmg);
 
         DamageNumbers.Spawn(transform.position, finalDmg, isPlayer, isBoss);
 
-        if (isPlayer && reflectPercent > 0f && source != null && !source.isDead && finalDmg > 0.5f)
+        float reflected = CombatMath.ReflectDamage(finalDmg, reflectPercent, isPlayer);
+        if (reflected > 0f && source != null && !source.isDead)
         {
-            float reflected = finalDmg * reflectPercent;
             source.ApplyRawDamage(reflected);
             DamageNumbers.Spawn(source.transform.position, reflected, false, source.isBoss);
         }

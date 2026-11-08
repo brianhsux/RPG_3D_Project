@@ -92,7 +92,7 @@ public class EnemyAI : MonoBehaviour
 
     void Start()
     {
-        var player = GameObject.FindGameObjectWithTag("Player");
+        var player = PlayerLookup.FindSoloHero();
         if (player != null) _player = player.transform;
         ApplyAnimStyleFromKind();
     }
@@ -143,7 +143,7 @@ public class EnemyAI : MonoBehaviour
 
         if (_player == null)
         {
-            var p = GameObject.FindGameObjectWithTag("Player");
+            var p = PlayerLookup.FindSoloHero();
             if (p != null) _player = p.transform;
             else return;
         }

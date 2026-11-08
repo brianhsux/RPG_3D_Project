@@ -195,7 +195,23 @@ public class NetBootstrap : MonoBehaviour
             if (string.IsNullOrEmpty(LastMessage) || LastMessage.StartsWith("Connected") || LastMessage.StartsWith("Hosting"))
                 LastMessage = "Disconnected";
             RestoreSoloPlayer();
+            if (AdventureManager.Instance != null)
+                AdventureManager.Instance.RestorePersonalProgress();
         }
+    }
+
+    /// <summary>Commit the HUD text only when Host or Client is pressed.</summary>
+    public bool TryUseConnectionFields(string addressField, string portField)
+    {
+        connectAddress = ConnectionDraft.NormalizeAddress(addressField);
+        if (!ConnectionDraft.TryParsePort(portField, out int port))
+        {
+            LastMessage = "Port must be 1-65535";
+            return false;
+        }
+
+        connectPort = (ushort)port;
+        return true;
     }
 
     public bool StartHost()
@@ -262,6 +278,8 @@ public class NetBootstrap : MonoBehaviour
         }
         LastMessage = "Disconnected";
         RestoreSoloPlayer();
+        if (AdventureManager.Instance != null)
+            AdventureManager.Instance.RestorePersonalProgress();
     }
 
     NetCombatSession EnsureCombatSession()

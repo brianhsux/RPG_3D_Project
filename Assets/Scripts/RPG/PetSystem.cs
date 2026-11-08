@@ -235,12 +235,8 @@ public static class PetCatalog
     {
         if (pet == null) return;
         EnsureBonds(pet);
-        int earned = TotalBondPointsFromLevel(pet.level);
-        int spent = SpentBondPoints(pet);
-        // If unspent + spent is less than earned, top up unspent (legacy / under-granted).
-        int have = pet.bondPoints + spent;
-        if (have < earned)
-            pet.bondPoints += earned - have;
+        pet.bondPoints = PetBondRules.TopUpUnspent(
+            pet.bondPoints, SpentBondPoints(pet), pet.level, ProgressionFormulas.MaxPetLevel);
     }
 
     public static int TotalBondPointsFromLevel(int level)
@@ -363,14 +359,13 @@ public static class PetCatalog
         EnsureBonds(pet);
         int i = (int)bond;
         if (i < 0 || i >= BondCount) return false;
-        return pet.bondPoints > 0 && pet.bondRanks[i] < MaxBondRank;
+        return PetBondRules.CanTrain(pet.bondPoints, pet.bondRanks[i], MaxBondRank);
     }
 
     public static bool TryTrain(PetInstance pet, PetBond bond)
     {
         if (!CanTrain(pet, bond)) return false;
-        pet.bondPoints--;
-        pet.bondRanks[(int)bond]++;
-        return true;
+        int i = (int)bond;
+        return PetBondRules.TryTrain(ref pet.bondPoints, ref pet.bondRanks[i], MaxBondRank);
     }
 }

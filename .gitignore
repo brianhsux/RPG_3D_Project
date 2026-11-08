@@ -27,6 +27,8 @@ Desktop.ini
 
 # VS / Rider generated
 *.csproj
+!Tools/**/*.csproj
+[Bb]in/
 *.unityproj
 *.sln
 *.suo

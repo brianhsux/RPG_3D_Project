@@ -6,35 +6,19 @@ using UnityEngine;
 /// </summary>
 public static class ProgressionFormulas
 {
-    public const int WorldCount = 25;
-    public const int MapsPerWorld = 4;
-    public const int MaxContentLevel = WorldCount * MapsPerWorld; // 100
+    public const int WorldCount = ProgressionRules.WorldCount;
+    public const int MapsPerWorld = ProgressionRules.MapsPerWorld;
+    public const int MaxContentLevel = ProgressionRules.MaxContentLevel;
     /// <summary>Hard cap for weapons, armor, and gems (matches MaxContentLevel).</summary>
-    public const int MaxItemLevel = 100;
+    public const int MaxItemLevel = ProgressionRules.MaxItemLevel;
     /// <summary>Hard cap for combat pets.</summary>
-    public const int MaxPetLevel = 100;
+    public const int MaxPetLevel = ProgressionRules.MaxPetLevel;
     /// <summary>AdventureManager / save use 0 for the Village hub (not an adventure world).</summary>
-    public const int VillageWorldId = 0;
+    public const int VillageWorldId = ProgressionRules.VillageWorldId;
 
-    public static int ContentLevel(int world, int map)
-    {
-        world = Mathf.Clamp(world, 1, WorldCount);
-        map = Mathf.Clamp(map, 1, MapsPerWorld);
-        return (world - 1) * MapsPerWorld + map;
-    }
+    public static int ContentLevel(int world, int map) => ProgressionRules.ContentLevel(world, map);
 
-    public static float RarityMult(ItemRarity rarity)
-    {
-        switch (rarity)
-        {
-            case ItemRarity.Common: return 1.00f;
-            case ItemRarity.Uncommon: return 1.15f;
-            case ItemRarity.Rare: return 1.35f;
-            case ItemRarity.Epic: return 1.60f;
-            case ItemRarity.Legendary: return 2.00f;
-            default: return 1f;
-        }
-    }
+    public static float RarityMult(ItemRarity rarity) => ProgressionRules.RarityMultiplier((int)rarity);
 
     // ---- Monster scaling ----
     public static float MobMaxHp(int contentLevel, bool isBoss)
@@ -149,10 +133,7 @@ public static class ProgressionFormulas
     }
 
     /// <summary>Incoming damage after defense. Soft diminishing returns.</summary>
-    public static float MitigateDamage(float rawDamage, float defense)
-    {
-        return rawDamage * (100f / (100f + Mathf.Max(0f, defense)));
-    }
+    public static float MitigateDamage(float rawDamage, float defense) => CombatMath.Mitigate(rawDamage, defense);
 
     public const float PlayerBaseAttackCooldown = 0.5f;
     public const float PlayerBaseAttackRange = 2.6f;
@@ -172,35 +153,29 @@ public static class ProgressionFormulas
         if (a == null || b == null || c == null) return null;
         if (a.slot != b.slot || b.slot != c.slot) return null;
 
-        int avg = Mathf.RoundToInt((a.itemLevel + b.itemLevel + c.itemLevel) / 3f);
-        int bonus = 2;
-        if (a.rarity >= ItemRarity.Rare && b.rarity >= ItemRarity.Rare && c.rarity >= ItemRarity.Rare)
-            bonus = 3;
+        int newLevel = ProgressionRules.SynthesisItemLevel(
+            a.itemLevel, b.itemLevel, c.itemLevel,
+            (int)a.rarity, (int)b.rarity, (int)c.rarity);
 
         ItemRarity best = a.rarity;
         if (b.rarity > best) best = b.rarity;
         if (c.rarity > best) best = c.rarity;
-        if (Random.value < 0.15f && best < ItemRarity.Legendary)
-            best = (ItemRarity)((int)best + 1);
+        // Roll even when the craft later fails (mismatched gems) so RNG stays aligned.
+        best = (ItemRarity)ProgressionRules.BumpRarity((int)best, Random.value);
 
-        int newLevel = Mathf.Clamp(avg + bonus, 1, MaxItemLevel);
         if (a.slot == ItemSlot.Gem)
         {
-            if (a.gemKind != b.gemKind || b.gemKind != c.gemKind) return null;
+            if (!ProgressionRules.SameGemKind((int)a.gemKind, (int)b.gemKind, (int)c.gemKind)) return null;
             return GemCatalog.CreateGem(a.gemKind, newLevel, best);
         }
 
-        // Preserve weapon profile tendency (majority vote), average speed/range bonuses.
-        int profile = a.weaponProfile;
-        if (b.weaponProfile == c.weaponProfile) profile = b.weaponProfile;
-        else if (a.weaponProfile == c.weaponProfile) profile = a.weaponProfile;
-        else if (a.weaponProfile == b.weaponProfile) profile = a.weaponProfile;
+        int profile = ProgressionRules.MajorityWeaponProfile(a.weaponProfile, b.weaponProfile, c.weaponProfile);
 
         var item = ItemFactory.Create(a.slot, newLevel, best, a.slot == ItemSlot.Weapon ? profile : -1);
         if (item != null && item.slot == ItemSlot.Weapon)
         {
-            item.attackSpeedBonus = (a.attackSpeedBonus + b.attackSpeedBonus + c.attackSpeedBonus) / 3f * 1.08f;
-            item.attackRangeBonus = (a.attackRangeBonus + b.attackRangeBonus + c.attackRangeBonus) / 3f * 1.08f;
+            item.attackSpeedBonus = ProgressionRules.AverageWeaponBonus(a.attackSpeedBonus, b.attackSpeedBonus, c.attackSpeedBonus);
+            item.attackRangeBonus = ProgressionRules.AverageWeaponBonus(a.attackRangeBonus, b.attackRangeBonus, c.attackRangeBonus);
             item.weaponProfile = profile;
         }
         return item;
@@ -281,25 +256,11 @@ public static class ProgressionFormulas
 
     // ---- Player XP / Level (no hard cap — soft XP curve forever) ----
     /// <summary>Soft display hint only; leveling is uncapped.</summary>
-    public const int SoftLevelMilestone = 60;
+    public const int SoftLevelMilestone = ProgressionRules.SoftLevelMilestone;
 
-    public static int XpToNextLevel(int level)
-    {
-        level = Mathf.Max(1, level);
-        // Soft curve: grows smoothly at high levels without a ceiling.
-        float linear = level * 28f;
-        float quad = level * level * 1.8f;
-        float late = level > SoftLevelMilestone
-            ? (level - SoftLevelMilestone) * (level - SoftLevelMilestone) * 0.35f
-            : 0f;
-        return Mathf.Max(40, Mathf.RoundToInt(35f + linear + quad + late));
-    }
+    public static int XpToNextLevel(int level) => ProgressionRules.XpToNextLevel(level);
 
-    public static int MobXpReward(int contentLevel, bool isBoss)
-    {
-        int xp = 12 + contentLevel * 8 + contentLevel * contentLevel / 4;
-        return isBoss ? xp * 5 : xp;
-    }
+    public static int MobXpReward(int contentLevel, bool isBoss) => ProgressionRules.MobXpReward(contentLevel, isBoss);
 
     public static float PlayerLevelBonusAtk(int level) => Mathf.Max(0, level - 1) * 2.2f;
     public static float PlayerLevelBonusDef(int level) => Mathf.Max(0, level - 1) * 1.4f;

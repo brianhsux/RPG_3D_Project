@@ -26,6 +26,26 @@ public class NetworkPlayerCombat : NetworkBehaviour
         DefaultAttackRange, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<float> AttackCooldownNv = new NetworkVariable<float>(
         DefaultAttackCooldown, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> Defense = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> CritChance = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> CritDamageBonus = new NetworkVariable<float>(
+        0.5f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> BlockChance = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> DamageReduction = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> ReflectPercent = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> FireBonus = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> IceBonus = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> PoisonBonus = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> Lifesteal = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     float _clientNextAttackTime;
     float _serverNextAttackTime;
@@ -102,15 +122,11 @@ public class NetworkPlayerCombat : NetworkBehaviour
             TryChallengeInteractInput();
 
         if (!IsOwner || !IsAlive) return;
-        if (PlayerInventory.Instance != null && PlayerInventory.Instance.showPanel)
-            return;
 
+        // Character panel keeps combat running, same as the solo hero.
         float range = AttackRangeNv.Value > 0.1f ? AttackRangeNv.Value : DefaultAttackRange;
         float cd = AttackCooldownNv.Value > 0.05f ? AttackCooldownNv.Value : DefaultAttackCooldown;
-
-        bool pressed = WasAttackPressed();
-        bool auto = HasEnemyInRange(range);
-        if (!pressed && !auto) return;
+        if (!HasEnemyInRange(range)) return;
         if (Time.time < _clientNextAttackTime) return;
 
         _clientNextAttackTime = Time.time + cd;
@@ -138,15 +154,50 @@ public class NetworkPlayerCombat : NetworkBehaviour
         float range = Mathf.Max(1f, stats.attackRange);
         float cd = Mathf.Max(0.15f, stats.EffectiveAttackCooldown);
         float maxHp = Mathf.Max(1f, stats.maxHealth);
-        SyncCombatStatsServerRpc(atk, range, cd, maxHp);
+        SyncCombatStatsServerRpc(
+            atk, range, cd, maxHp,
+            Mathf.Max(0f, stats.defense),
+            Mathf.Clamp01(stats.critChance),
+            Mathf.Max(0f, stats.critDamageBonus),
+            Mathf.Clamp01(stats.blockChance),
+            Mathf.Clamp01(stats.damageReduction),
+            Mathf.Max(0f, stats.reflectPercent),
+            stats.fireBonus,
+            stats.iceBonus,
+            stats.poisonBonus,
+            Mathf.Max(0f, stats.lifesteal));
     }
 
     [ServerRpc]
-    void SyncCombatStatsServerRpc(float attack, float range, float cooldown, float maxHp)
+    void SyncCombatStatsServerRpc(
+        float attack,
+        float range,
+        float cooldown,
+        float maxHp,
+        float defense,
+        float critChance,
+        float critDamageBonus,
+        float blockChance,
+        float damageReduction,
+        float reflectPercent,
+        float fire,
+        float ice,
+        float poison,
+        float lifesteal)
     {
         AttackPower.Value = Mathf.Max(1f, attack);
         AttackRangeNv.Value = Mathf.Max(1f, range);
         AttackCooldownNv.Value = Mathf.Max(0.15f, cooldown);
+        Defense.Value = Mathf.Max(0f, defense);
+        CritChance.Value = Mathf.Clamp01(critChance);
+        CritDamageBonus.Value = Mathf.Max(0f, critDamageBonus);
+        BlockChance.Value = Mathf.Clamp01(blockChance);
+        DamageReduction.Value = Mathf.Clamp01(damageReduction);
+        ReflectPercent.Value = Mathf.Max(0f, reflectPercent);
+        FireBonus.Value = fire;
+        IceBonus.Value = ice;
+        PoisonBonus.Value = poison;
+        Lifesteal.Value = Mathf.Max(0f, lifesteal);
 
         float prevMax = MaxHp.Value;
         MaxHp.Value = Mathf.Max(1f, maxHp);
@@ -164,14 +215,67 @@ public class NetworkPlayerCombat : NetworkBehaviour
         if (!IsAlive) return;
         float cd = AttackCooldownNv.Value > 0.05f ? AttackCooldownNv.Value : DefaultAttackCooldown;
         if (Time.time < _serverNextAttackTime) return;
-        _serverNextAttackTime = Time.time + cd;
 
         float range = AttackRangeNv.Value > 0.1f ? AttackRangeNv.Value : DefaultAttackRange;
-        float dmg = AttackPower.Value > 0.1f ? AttackPower.Value : DefaultAttack;
-
         var enemy = FindNearestEnemyInRange(range);
         if (enemy == null) return;
-        enemy.ApplyDamageServer(dmg, OwnerClientId);
+
+        _serverNextAttackTime = Time.time + cd;
+        float raw = CombatMath.OutgoingDamage(
+            AttackPower.Value > 0.1f ? AttackPower.Value : DefaultAttack,
+            CritChance.Value,
+            CritDamageBonus.Value,
+            Random.value,
+            FireBonus.Value,
+            IceBonus.Value,
+            PoisonBonus.Value);
+        float dealt = enemy.ApplyDamageServer(raw, OwnerClientId);
+        float heal = CombatMath.LifestealHeal(dealt, Lifesteal.Value);
+        if (heal > 0f && CurrentHp.Value > 0f)
+        {
+            float before = CurrentHp.Value;
+            CurrentHp.Value = Mathf.Min(MaxHp.Value, CurrentHp.Value + heal);
+            float gained = CurrentHp.Value - before;
+            if (gained > 0.5f)
+                ShowHealClientRpc(gained);
+        }
+    }
+
+    /// <summary>Host-only. Block roll matches solo: only when block chance is positive.</summary>
+    public float MitigateIncomingServer(float raw)
+    {
+        bool blocked = BlockChance.Value > 0f && Random.value < BlockChance.Value;
+        return CombatMath.MitigatePlayerIncoming(raw, Defense.Value, DamageReduction.Value, blocked);
+    }
+
+    public float ReflectFromLastHit(float dealt)
+    {
+        return CombatMath.ReflectDamage(dealt, ReflectPercent.Value, defenderIsPlayer: true);
+    }
+
+    public static void RequestOwnerHeal(float amount)
+    {
+        if (amount <= 0f) return;
+        var local = FindOwnedCombat();
+        if (local == null || !local.IsAlive) return;
+        local.HealServerRpc(amount);
+    }
+
+    [ServerRpc]
+    void HealServerRpc(float amount)
+    {
+        if (CurrentHp.Value <= 0f) return;
+        float before = CurrentHp.Value;
+        CurrentHp.Value = Mathf.Min(MaxHp.Value, before + Mathf.Max(0f, amount));
+        float gained = CurrentHp.Value - before;
+        if (gained > 0.5f)
+            ShowHealClientRpc(gained);
+    }
+
+    [ClientRpc]
+    void ShowHealClientRpc(float amount)
+    {
+        DamageNumbers.Spawn(transform.position, amount, true, false);
     }
 
     /// <summary>Host-only damage entry used by NetworkEnemy AI.</summary>
@@ -181,7 +285,7 @@ public class NetworkPlayerCombat : NetworkBehaviour
         if (CurrentHp.Value <= 0f) return;
 
         float dealt = Mathf.Max(0f, amount);
-        CurrentHp.Value = Mathf.Max(0f, CurrentHp.Value - dealt);
+        CurrentHp.Value = CombatMath.SubtractHp(CurrentHp.Value, dealt);
         if (dealt >= 0.5f)
             ShowDamageClientRpc(dealt);
 
@@ -314,20 +418,6 @@ public class NetworkPlayerCombat : NetworkBehaviour
             if (stats != null) return stats;
         }
         return null;
-    }
-
-    static bool WasAttackPressed()
-    {
-        var mouse = Mouse.current;
-        if (mouse != null && mouse.leftButton.wasPressedThisFrame)
-            return true;
-        var kb = Keyboard.current;
-        if (kb != null && kb.fKey.wasPressedThisFrame)
-            return true;
-        var pad = Gamepad.current;
-        if (pad != null && pad.buttonWest.wasPressedThisFrame)
-            return true;
-        return false;
     }
 
     void CacheBody()
